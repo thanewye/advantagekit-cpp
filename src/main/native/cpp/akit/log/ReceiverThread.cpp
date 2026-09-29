@@ -46,7 +46,19 @@ namespace akit {
         thread_ = std::thread(&ReceiverThread::Run, this, std::move(initialReceivers));
     }
 
+    void ReceiverThread::StartSynchronous() {
+        if (thread_.joinable() || synchronousRunning_) return;
+        synchronousRunning_ = true;
+        for (auto* receiver : SnapshotReceivers())
+            receiver->Start();
+    }
+
     void ReceiverThread::End() {
+        if (synchronousRunning_) {
+            synchronousRunning_ = false;
+            EndReceivers();
+            return;
+        }
         if (!thread_.joinable()) return;
         {
             std::lock_guard lock(mutex_);
@@ -93,11 +105,14 @@ namespace akit {
         return entry;
     }
 
-    void ReceiverThread::Dispatch(LogStorage& entry) {
-        LogTable view(entry);
+    void ReceiverThread::DispatchNow(const LogTable& table) {
+        Dispatch(table);
+    }
+
+    void ReceiverThread::Dispatch(const LogTable& table) {
         for (auto* receiver : SnapshotReceivers()) {
             try {
-                receiver->PutTable(view);
+                receiver->PutTable(table);
             } catch (const std::exception& e) {
                 FRC_ReportError(frc::err::Error, "[AdvantageKit] Data receiver threw an exception: {}", e.what());
             } catch (...) {
@@ -113,9 +128,13 @@ namespace akit {
         while (true) {
             std::optional<LogStorage> entry = WaitAndPop();
             if (!entry) break;
-            Dispatch(*entry);
+            Dispatch(LogTable(*entry));
         }
 
+        EndReceivers();
+    }
+
+    void ReceiverThread::EndReceivers() {
         for (auto* receiver : SnapshotReceivers())
             receiver->End();
     }

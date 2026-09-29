@@ -113,6 +113,26 @@ namespace {
         EXPECT_EQ(r2.Log(), (std::vector<std::string>{"Start:B", "PutTable:B:1", "PutTable:B:2", "End:B"}));
     }
 
+    TEST(ReceiverThreadTest, SynchronousModeDispatchesOnCallingThreadInOrder) {
+        ReceiverThread thread;
+        RecordingReceiver receiver("R");
+        thread.AddDataReceiver(&receiver);
+        thread.StartSynchronous();
+        EXPECT_EQ(receiver.Log(), (std::vector<std::string>{"Start:R"}));
+
+        LogStorage first = MakeSnapshot(1);
+        thread.DispatchNow(LogTable(first));
+        EXPECT_EQ(receiver.Log(), (std::vector<std::string>{"Start:R", "PutTable:R:1"}));
+
+        LogStorage second = MakeSnapshot(2);
+        thread.DispatchNow(LogTable(second));
+        EXPECT_EQ(thread.QueueSize(), 0u);
+        thread.End();
+        thread.End();
+
+        EXPECT_EQ(receiver.Log(), (std::vector<std::string>{"Start:R", "PutTable:R:1", "PutTable:R:2", "End:R"}));
+    }
+
     TEST(ReceiverThreadTest, OverflowPastCapacityDropsAndSetsFault) {
         ReceiverThread thread;
         RecordingReceiver blocker("Blocker", /*blockUntilReleased=*/true);

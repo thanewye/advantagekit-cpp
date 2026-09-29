@@ -1,8 +1,12 @@
 #pragma once
 
+#include <algorithm>
+#include <bit>
+#include <cmath>
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <variant>
 #include <vector>
@@ -22,6 +26,29 @@ namespace akit {
                                          std::vector<double>,     // DoubleArray
                                          std::vector<std::string> // StringArray
                                          >;
+
+    /** Matches Java's Double.equals/Float.equals: NaN equals NaN, otherwise compares bit patterns. */
+    template<typename Floating> bool FloatingBitsEqual(Floating lhs, Floating rhs) {
+        using Bits = std::conditional_t<std::is_same_v<Floating, float>, uint32_t, uint64_t>;
+        return (std::isnan(lhs) && std::isnan(rhs)) || std::bit_cast<Bits>(lhs) == std::bit_cast<Bits>(rhs);
+    }
+
+    /** Compares variant contents with Java's LogValue.equals semantics for floating-point values and arrays. */
+    inline bool LogValueVariantsEqual(const LogValueVariant& lhs, const LogValueVariant& rhs) {
+        if (lhs.index() != rhs.index()) return false;
+        return std::visit(
+            [&rhs]<typename T>(const T& lhsValue) {
+                const T& rhsValue = std::get<T>(rhs);
+                if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>) {
+                    return FloatingBitsEqual(lhsValue, rhsValue);
+                } else if constexpr (std::is_same_v<T, std::vector<float>> || std::is_same_v<T, std::vector<double>>) {
+                    return std::ranges::equal(lhsValue, rhsValue, [](auto a, auto b) { return FloatingBitsEqual(a, b); });
+                } else {
+                    return lhsValue == rhsValue;
+                }
+            },
+            lhs);
+    }
 
     struct LogValue {
         LogValueVariant value;
@@ -100,7 +127,7 @@ namespace akit {
         }
 
         bool operator==(const LogValue& other) const {
-            return type == other.type && customTypeStr == other.customTypeStr && unitStr == other.unitStr && value == other.value;
+            return type == other.type && customTypeStr == other.customTypeStr && unitStr == other.unitStr && LogValueVariantsEqual(value, other.value);
         }
 
         bool operator!=(const LogValue& other) const { return !(*this == other); }

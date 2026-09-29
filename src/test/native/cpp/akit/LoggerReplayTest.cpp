@@ -250,6 +250,35 @@ namespace {
         EXPECT_EQ(receiver.endCalls, 1);
     }
 
+    TEST_F(LoggerReplayParityTest, ReplayDispatchesEachCycleSynchronouslyWithoutQueueing) {
+        CaptureReceiver receiver;
+        StubReplaySource replaySource({
+            ReplayFrame{1'000, [](LogTable& table) { table.GetSubtable("ReplayInputs").Put("Applied", 1.0); }},
+            ReplayFrame{2'000, [](LogTable& table) { table.GetSubtable("ReplayInputs").Put("Applied", 2.0); }},
+            ReplayFrame{3'000, {}},
+        });
+
+        Logger::AddDataReceiver(&receiver);
+        Logger::SetReplaySource(&replaySource);
+        Logger::Start();
+
+        Logger::PeriodicAfterUser();
+        ASSERT_EQ(receiver.snapshots.size(), 1u);
+        EXPECT_EQ(receiver.snapshots[0].timestamp, 1'000);
+        EXPECT_DOUBLE_EQ(std::get<double>(receiver.snapshots[0].values.at("/ReplayInputs/Applied").value), 1.0);
+
+        Logger::PeriodicBeforeUser();
+        Logger::PeriodicAfterUser();
+        ASSERT_EQ(receiver.snapshots.size(), 2u);
+        EXPECT_EQ(receiver.snapshots[1].timestamp, 2'000);
+        EXPECT_DOUBLE_EQ(std::get<double>(receiver.snapshots[1].values.at("/ReplayInputs/Applied").value), 2.0);
+        EXPECT_EQ(std::get<int64_t>(receiver.snapshots[1].values.at("/ReplayOutputs/Logger/QueuedCycles").value), 0);
+        EXPECT_FALSE(Logger::GetReceiverQueueFault());
+
+        Logger::End();
+        EXPECT_EQ(receiver.endCalls, 1);
+    }
+
     TEST_F(LoggerReplayParityTest, ReplayAfterUserPreservesReplayedSystemStats) {
         StubReplaySource replaySource({
             ReplayFrame{

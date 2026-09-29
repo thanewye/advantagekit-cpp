@@ -132,8 +132,12 @@ namespace akit {
         LogTable meta = LogTable(currentStorage_).GetSubtable(HasReplaySource() ? "ReplayMetadata" : "RealMetadata");
         for (const auto& [k, v] : metadata_)
             meta.Put(k, v);
-        if (HasReplaySource()) replaySource_->Start();
-        receiverThread_.Start();
+        if (HasReplaySource()) {
+            replaySource_->Start();
+            receiverThread_.StartSynchronous();
+        } else {
+            receiverThread_.Start();
+        }
         PeriodicBeforeUser();
     }
 
@@ -242,6 +246,10 @@ namespace akit {
         RecordOutput("LoggedRobot/LogPeriodicMS", (periodicBeforeUs + periodicAfterUs) / 1000.0);
         RecordOutput("LoggedRobot/FullCycleMS", (periodicBeforeUs + userCodeUs + periodicAfterUs) / 1000.0);
         RecordOutput("Logger/QueuedCycles", static_cast<int64_t>(receiverThread_.QueueSize()));
+        if (HasReplaySource()) {
+            receiverThread_.DispatchNow(root);
+            return;
+        }
         LogStorage snapshot;
         LogTable::Clone(root, snapshot);
         if (!receiverThread_.Enqueue(std::move(snapshot))) {

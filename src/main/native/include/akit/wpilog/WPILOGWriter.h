@@ -35,12 +35,16 @@ namespace akit::wpilog {
         bool isOpen_ = false;
         AdvantageScopeOpenBehavior openBehavior_;
 
-        LogStorage lastStorage_;
-        int64_t timestampID_ = 0;
+        struct EntryState {
+            int64_t id = 0;
+            std::optional<std::string> unit;
+            std::optional<LogValue> lastWrittenValue;
+            uint64_t lastPresentCycle = 0;
+        };
 
-        std::unordered_map<std::string, int64_t> entryIDs_;
-        std::unordered_map<std::string, LoggableType> entryTypes_;
-        std::unordered_map<std::string, std::optional<std::string>> entryUnits_;
+        int64_t timestampID_ = 0;
+        uint64_t cycle_ = 0;
+        std::unordered_map<std::string, EntryState> entries_;
 
         [[nodiscard]] LoggableType GetType(const LogValue& value) const;
         void AppendValue(int64_t entryID, const LogValue& value, int64_t timestamp);

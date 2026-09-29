@@ -108,12 +108,10 @@ namespace akit::wpilog {
         }
         isOpen_ = true;
         timestampID_ = log_->Start(kTimestampKey, GetWPILOGType(LoggableType::kInteger), WPILOGConstants::kEntryMetadata, 0);
-        lastStorage_ = LogStorage();
+        cycle_ = 0;
 
         // reset data
-        entryIDs_.clear();
-        entryTypes_.clear();
-        entryUnits_.clear();
+        entries_.clear();
         dsAttachedTime_ = std::nullopt;
         logDate_ = std::nullopt;
         logMatchText_ = std::nullopt;
@@ -250,36 +248,35 @@ namespace akit::wpilog {
         }
 
         log_->AppendInteger(timestampID_, timestamp, timestamp);
-        const auto& newMap = table.GetAll();
-        for (const auto& [key, value] : newMap) {
-            const auto existingID = entryIDs_.find(key);
+        ++cycle_;
+        for (const auto& [key, value] : table.GetAll()) {
+            auto [entryIt, isNewEntry] = entries_.try_emplace(key);
+            EntryState& entry = entryIt->second;
             bool appendData = false;
 
-            if (existingID == entryIDs_.end()) {
-                entryIDs_.emplace(key, log_->Start(key, value.GetWPILOGType(), getMetadata(value.unitStr), timestamp));
-                entryTypes_.emplace(key, value.type);
-                entryUnits_.emplace(key, value.unitStr);
+            if (isNewEntry) {
+                entry.id = log_->Start(key, value.GetWPILOGType(), getMetadata(value.unitStr), timestamp);
+                entry.unit = value.unitStr;
                 appendData = true;
             } else {
-                auto oldValue = lastStorage_.values.find(key);
-                appendData = oldValue == lastStorage_.values.end() || oldValue->second.type != value.type ||
-                             oldValue->second.customTypeStr != value.customTypeStr || oldValue->second.value != value.value;
+                const bool presentLastCycle = entry.lastPresentCycle + 1 == cycle_;
+                const auto& lastValue = entry.lastWrittenValue;
+                appendData = !presentLastCycle || !lastValue.has_value() || lastValue->type != value.type ||
+                             lastValue->customTypeStr != value.customTypeStr || !LogValueVariantsEqual(lastValue->value, value.value);
 
-                auto currentUnit = entryUnits_.find(key);
-                const std::optional<std::string> oldUnit = currentUnit == entryUnits_.end() ? std::nullopt : currentUnit->second;
-                if (oldUnit != value.unitStr) {
-                    log_->SetMetadata(entryIDs_.at(key), getMetadata(value.unitStr), timestamp);
-                    entryUnits_.insert_or_assign(key, value.unitStr);
+                if (entry.unit != value.unitStr) {
+                    log_->SetMetadata(entry.id, getMetadata(value.unitStr), timestamp);
+                    entry.unit = value.unitStr;
                 }
             }
 
             if (appendData) {
-                AppendValue(entryIDs_.at(key), value, timestamp);
+                AppendValue(entry.id, value, timestamp);
+                entry.lastWrittenValue = value;
             }
+            entry.lastPresentCycle = cycle_;
         }
 
         log_->Flush();
-        lastStorage_.values = newMap;
-        lastStorage_.timestamp = timestamp;
     }
 } // namespace akit::wpilog

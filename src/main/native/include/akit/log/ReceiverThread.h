@@ -52,8 +52,14 @@ namespace akit {
         /** Spawns the background dispatch thread. */
         void Start();
 
-        /** Signals stop, drains the queue, and joins the thread. */
+        /** Starts receivers on the calling thread; each cycle is then written through DispatchNow instead of the queue. */
+        void StartSynchronous();
+
+        /** Signals stop, drains the queue, and joins the thread, or ends receivers directly in synchronous mode. */
         void End();
+
+        /** Writes the table to every receiver on the calling thread. */
+        void DispatchNow(const LogTable& table);
 
         /**
          * Enqueues a deep-copied snapshot for background dispatch.
@@ -81,7 +87,8 @@ namespace akit {
 
     private:
         void Run(std::vector<LogDataReceiver*> initialReceivers);
-        void Dispatch(LogStorage& entry);
+        void Dispatch(const LogTable& table);
+        void EndReceivers();
         [[nodiscard]] std::optional<LogStorage> WaitAndPop();
         [[nodiscard]] std::vector<LogDataReceiver*> SnapshotReceivers() const;
 
@@ -91,6 +98,7 @@ namespace akit {
         std::deque<LogStorage> queue_;
         bool stopRequested_ = false;
         bool faulted_ = false;
+        bool synchronousRunning_ = false;
 
         std::thread thread_;
     };
