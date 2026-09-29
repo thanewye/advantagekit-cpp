@@ -3,14 +3,19 @@
 #include "akit/Logger.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <memory>
 #include <span>
 #include <utility>
 
+#include <frc/Errors.h>
 #include <frc/RobotBase.h>
 #include <frc/RobotController.h>
 #include <frc/Timer.h>
+#include <hal/FRCUsageReporting.h>
+#include <wpimath/MathShared.h>
 
 #include "akit/AlertLogger.h"
 #include "akit/ConsoleSource.h"
@@ -22,6 +27,74 @@
 #include "akit/telemetry/LoggedPowerDistribution.h"
 #include "akit/telemetry/LoggedSystemStats.h"
 #include "akit/telemetry/RadioLogger.h"
+
+namespace {
+    class TimerBasedMathShared : public wpi::math::MathShared {
+    public:
+        void ReportErrorV(fmt::string_view format, fmt::format_args args) override { frc::ReportErrorV(frc::err::Error, "", 0, "", format, args); }
+
+        void ReportWarningV(fmt::string_view format, fmt::format_args args) override { frc::ReportErrorV(frc::warn::Warning, "", 0, "", format, args); }
+
+        void ReportUsage(wpi::math::MathUsageId id, int count) override {
+            using wpi::math::MathUsageId;
+            switch (id) {
+            case MathUsageId::kKinematics_DifferentialDrive:
+                HAL_Report(HALUsageReporting::kResourceType_Kinematics, HALUsageReporting::kKinematics_DifferentialDrive);
+                break;
+            case MathUsageId::kKinematics_MecanumDrive:
+                HAL_Report(HALUsageReporting::kResourceType_Kinematics, HALUsageReporting::kKinematics_MecanumDrive);
+                break;
+            case MathUsageId::kKinematics_SwerveDrive:
+                HAL_Report(HALUsageReporting::kResourceType_Kinematics, HALUsageReporting::kKinematics_SwerveDrive);
+                break;
+            case MathUsageId::kTrajectory_TrapezoidProfile:
+                HAL_Report(HALUsageReporting::kResourceType_TrapezoidProfile, count);
+                break;
+            case MathUsageId::kFilter_Linear:
+                HAL_Report(HALUsageReporting::kResourceType_LinearFilter, count);
+                break;
+            case MathUsageId::kOdometry_DifferentialDrive:
+                HAL_Report(HALUsageReporting::kResourceType_Odometry, HALUsageReporting::kOdometry_DifferentialDrive);
+                break;
+            case MathUsageId::kOdometry_SwerveDrive:
+                HAL_Report(HALUsageReporting::kResourceType_Odometry, HALUsageReporting::kOdometry_SwerveDrive);
+                break;
+            case MathUsageId::kOdometry_MecanumDrive:
+                HAL_Report(HALUsageReporting::kResourceType_Odometry, HALUsageReporting::kOdometry_MecanumDrive);
+                break;
+            case MathUsageId::kController_PIDController2:
+                HAL_Report(HALUsageReporting::kResourceType_PIDController2, count);
+                break;
+            case MathUsageId::kController_ProfiledPIDController:
+                HAL_Report(HALUsageReporting::kResourceType_ProfiledPIDController, count);
+                break;
+            case MathUsageId::kController_BangBangController:
+                HAL_Report(HALUsageReporting::kResourceType_BangBangController, count);
+                break;
+            case MathUsageId::kTrajectory_PathWeaver:
+                HAL_Report(HALUsageReporting::kResourceType_PathWeaverTrajectory, count);
+                break;
+            case MathUsageId::kController_LinearQuadraticRegulator:
+                HAL_Report(HALUsageReporting::kResourceType_LinearQuadraticRegulator, count);
+                break;
+            case MathUsageId::kEstimator_KalmanFilter:
+                HAL_Report(HALUsageReporting::kResourceType_KalmanFilter, count);
+                break;
+            case MathUsageId::kEstimator_PoseEstimator:
+                HAL_Report(HALUsageReporting::kResourceType_PoseEstimator, count);
+                break;
+            case MathUsageId::kEstimator_PoseEstimator3d:
+                HAL_Report(HALUsageReporting::kResourceType_PoseEstimator3d, count);
+                break;
+            case MathUsageId::kSystem_LinearSystemLoop:
+                HAL_Report(HALUsageReporting::kResourceType_LinearSystemLoop, count);
+                break;
+            }
+        }
+
+        units::second_t GetTimestamp() override { return frc::Timer::GetTimestamp(); }
+    };
+} // namespace
 
 namespace akit {
     void Logger::Start() {
@@ -51,7 +124,8 @@ namespace akit {
         }
 
         running_ = true;
-        frc::RobotController::SetTimeSource([]() -> uint64_t { return static_cast<uint64_t>(GetTimestamp().value() * 1'000'000.0); });
+        frc::RobotController::SetTimeSource([]() -> uint64_t { return static_cast<uint64_t>(std::llround(GetTimestamp().value() * 1'000'000.0)); });
+        wpi::math::MathSharedStore::SetMathShared(std::make_unique<TimerBasedMathShared>());
         lastTimestamp_ = static_cast<int64_t>(frc::Timer::GetFPGATimestamp().value() * 1'000'000.0);
         currentStorage_.Clear();
         currentStorage_.timestamp = 0;
