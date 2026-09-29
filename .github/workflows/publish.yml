@@ -23,7 +23,10 @@ env:
 jobs:
   validate:
     runs-on: ubuntu-22.04
+    outputs:
+      ci_run_id: ${{ steps.ci_run.outputs.run_id }}
     permissions:
+      actions: read
       contents: read
       pages: write
     steps:
@@ -38,87 +41,82 @@ jobs:
             echo "Invalid version: $PUBLISH_VERSION" >&2
             exit 1
           fi
-
-  build-linux:
-    needs: validate
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - container: wpilib/roborio-cross-ubuntu:2025-22.04
-            name: roboRIO
-            options: -Ponlylinuxathena
-          - container: wpilib/raspbian-cross-ubuntu:bookworm-22.04
-            name: Linux ARM32
-            options: -Ponlylinuxarm32
-          - container: wpilib/aarch64-cross-ubuntu:bookworm-22.04
-            name: Linux ARM64
-            options: -Ponlylinuxarm64
-          - container: wpilib/ubuntu-base:22.04
-            name: Linux x86-64
-            options: ''
-    name: Build ${{ matrix.name }}
-    runs-on: ubuntu-22.04
-    container: ${{ matrix.container }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-      - run: ./gradlew build -PreleaseMode ${{ matrix.options }}
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.name }}
-          path: build/allOutputs
-
-  build-desktop:
-    needs: validate
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-2022
-            name: Windows x86-64
-            architecture: x64
-          - os: macos-14
-            name: macOS universal
-            architecture: aarch64
-    name: Build ${{ matrix.name }}
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-          architecture: ${{ matrix.architecture }}
-      - run: ./gradlew build -PreleaseMode -Pbuildalldesktop
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.name }}
-          path: build/allOutputs
+      - name: Find successful CI run for this commit
+        id: ci_run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ci_run_id="$(gh api --method GET \
+            "/repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" \
+            -f head_sha="$GITHUB_SHA" \
+            -f status=success \
+            -F per_page=1 \
+            --jq '.workflow_runs[0].id // empty')"
+          if [[ -z "$ci_run_id" ]]; then
+            echo "No successful CI run found for commit $GITHUB_SHA." >&2
+            exit 1
+          fi
+          echo "run_id=$ci_run_id" >> "$GITHUB_OUTPUT"
 
   combine:
-    needs: [build-linux, build-desktop]
+    needs: validate
     permissions:
+      actions: read
       contents: read
     runs-on: ubuntu-22.04
     steps:
+      - uses: actions/checkout@v4
+        with:
+          path: source
       - uses: actions/checkout@v4
         with:
           repository: wpilibsuite/build-tools
+          path: combiner
       - uses: actions/download-artifact@v4
         with:
-          path: combiner/products/build/allOutputs
+          name: roboRIO
+          path: ci-artifacts/roboRIO
+          github-token: ${{ github.token }}
+          run-id: ${{ needs.validate.outputs.ci_run_id }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: Linux ARM32
+          path: ci-artifacts/linux-arm32
+          github-token: ${{ github.token }}
+          run-id: ${{ needs.validate.outputs.ci_run_id }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: Linux ARM64
+          path: ci-artifacts/linux-arm64
+          github-token: ${{ github.token }}
+          run-id: ${{ needs.validate.outputs.ci_run_id }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: Linux x86-64
+          path: ci-artifacts/linux-x86-64
+          github-token: ${{ github.token }}
+          run-id: ${{ needs.validate.outputs.ci_run_id }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: Windows x86-64
+          path: ci-artifacts/windows-x86-64
+          github-token: ${{ github.token }}
+          run-id: ${{ needs.validate.outputs.ci_run_id }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: macOS universal
+          path: ci-artifacts/macos-universal
+          github-token: ${{ github.token }}
+          run-id: ${{ needs.validate.outputs.ci_run_id }}
       - name: Combine platform outputs
         shell: bash
-        run: rsync -a --delete combiner/products/build/allOutputs/*/* combiner/products/build/allOutputs/
+        run: |
+          mkdir -p combiner/products/build/allOutputs
+          for artifact_directory in ci-artifacts/*; do
+            rsync -a "$artifact_directory/" combiner/products/build/allOutputs/
+          done
+          printf '%s\n' "$PUBLISH_VERSION" > combiner/products/build/allOutputs/version.txt
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -131,7 +129,18 @@ jobs:
         run: |
           mkdir -p pages/maven
           rsync -a "$HOME/releases/maven/release/" pages/maven/
-          unzip -q combiner/products/build/allOutputs/vendordepJson.zip -d pages
+          jq \
+            --arg version "$PUBLISH_VERSION" \
+            --arg groupId "$PUBLISH_GROUP" \
+            --arg mavenUrl "$ORG_GRADLE_PROJECT_vendordepMavenUrl" \
+            --arg jsonUrl "$ORG_GRADLE_PROJECT_vendordepJsonUrl" \
+            '.version = $version
+              | .mavenUrls = [$mavenUrl]
+              | .jsonUrl = $jsonUrl
+              | .cppDependencies[0].groupId = $groupId
+              | .cppDependencies[0].artifactId = "advantagekit-cpp"
+              | .cppDependencies[0].version = $version' \
+            source/AdvantageKitCpp.json > pages/AdvantageKitCpp.json
           cp pages/AdvantageKitCpp.json "pages/AdvantageKitCpp-$PUBLISH_VERSION.json"
       - uses: actions/upload-artifact@v4
         with:
