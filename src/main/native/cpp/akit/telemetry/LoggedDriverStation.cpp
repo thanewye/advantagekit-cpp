@@ -54,7 +54,7 @@ namespace akit {
             joystickTable.Put("Name", Trim(desc.name));
             joystickTable.Put("Type", static_cast<int64_t>(desc.type));
             joystickTable.Put("Xbox", static_cast<bool>(desc.isXbox));
-            joystickTable.Put("ButtonCount", desc.buttonCount);
+            joystickTable.Put("ButtonCount", static_cast<int64_t>(desc.buttonCount));
 
             HAL_JoystickButtons buttons{};
             HAL_GetJoystickButtons(id, &buttons);
@@ -151,7 +151,7 @@ namespace akit {
                 DriverStationSim::SetJoystickPOV(id, pov, povValues[pov]);
             }
 
-            const auto axisValues = joystickTable.Get("AxisValues", std::vector<float>{});
+            const auto axisValues = joystickTable.Get("AxisValues", std::span<const float>{});
             auto axisTypes = joystickTable.Get("AxisTypes", std::span<const int>{});
             axisTypes.resize(axisValues.size(), 0);
 
