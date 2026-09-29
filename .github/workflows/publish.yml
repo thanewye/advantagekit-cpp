@@ -112,18 +112,18 @@ jobs:
       - name: Combine platform outputs
         shell: bash
         run: |
-          mkdir -p combiner/products/build/allOutputs
+          mkdir -p combiner/combiner/products/build/allOutputs
           for artifact_directory in ci-artifacts/*; do
-            rsync -a "$artifact_directory/" combiner/products/build/allOutputs/
+            rsync -a "$artifact_directory/" combiner/combiner/products/build/allOutputs/
           done
-          printf '%s\n' "$PUBLISH_VERSION" > combiner/products/build/allOutputs/version.txt
+          printf '%s\n' "$PUBLISH_VERSION" > combiner/combiner/products/build/allOutputs/version.txt
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
       - name: Create Maven repository
         run: ./gradlew publish -Pthirdparty -PreleaseRepoPublish
-        working-directory: combiner
+        working-directory: combiner/combiner
       - name: Assemble Pages candidate
         shell: bash
         run: |
