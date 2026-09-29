@@ -1,0 +1,144 @@
+apply plugin: 'maven-publish'
+
+ext.licenseFiles = files(
+    "$rootDir/LICENSE",
+    "$rootDir/ADVANTAGEKIT-LICENSE",
+    "$rootDir/WPILIB-LICENSE.md",
+    "$rootDir/MAGIC_ENUM-LICENSE",
+    "$rootDir/PFR-LICENSE"
+)
+
+def pubVersion = project.findProperty('publishVersion') ?: '0.1.0'
+def artifactGroupId = project.findProperty('publishGroup') ?: 'com.ethanye.advantagekit'
+def baseArtifactId = 'advantagekit'
+def vendordepMavenUrl = project.findProperty('vendordepMavenUrl') ?: 'https://example.invalid/advantagekit-cpp/maven'
+def vendordepJsonUrl = project.findProperty('vendordepJsonUrl') ?: 'https://example.invalid/advantagekit-cpp/AdvantageKitCpp.json'
+def templateVendorFile = 'AdvantageKitCpp.json'
+def outputsFolder = file("$buildDir/outputs")
+def releasesRepoUrl = file("$buildDir/repos/releases")
+def zipBaseName = "_GROUP_${artifactGroupId.replace('.', '_')}_ID_${baseArtifactId}-cpp_CLS"
+
+tasks.register('outputVersion') {
+    outputs.file("$outputsFolder/version.txt")
+    doLast {
+        outputsFolder.mkdirs()
+        file("$outputsFolder/version.txt").text = pubVersion
+    }
+}
+
+tasks.register('copyAllOutputs', Copy) {
+    destinationDir = file("$buildDir/allOutputs")
+    dependsOn tasks.named('outputVersion')
+    from("$outputsFolder/version.txt")
+}
+
+ext.addTaskToCopyAllOutputs = { archiveTask ->
+    tasks.named('copyAllOutputs') {
+        dependsOn archiveTask
+        from archiveTask.archiveFile
+    }
+}
+
+tasks.register('cppHeadersZip', Zip) {
+    destinationDirectory = outputsFolder
+    archiveBaseName = zipBaseName
+    archiveClassifier = 'headers'
+
+    from(licenseFiles) {
+        into '/'
+    }
+    from('src/main/native/include') {
+        into '/'
+    }
+    from('third_party/pfr/include') {
+        into '/'
+    }
+    from('third_party/magic_enum/include') {
+        into '/'
+    }
+}
+
+tasks.register('cppSourceZip', Zip) {
+    destinationDirectory = outputsFolder
+    archiveBaseName = zipBaseName
+    archiveClassifier = 'sources'
+
+    from(licenseFiles) {
+        into '/'
+    }
+    from('src/main/native/cpp') {
+        into 'src/main/native/cpp'
+    }
+    from('src/main/native/include') {
+        into 'src/main/native/include'
+    }
+    from('third_party/pfr/include') {
+        into 'third_party/pfr/include'
+    }
+    from('third_party/magic_enum/include') {
+        into 'third_party/magic_enum/include'
+    }
+}
+
+tasks.register('vendordepJson') {
+    outputs.file("$buildDir/vendordep/$templateVendorFile")
+    doLast {
+        copy {
+            from templateVendorFile
+            into "$buildDir/vendordep"
+            expand(
+                version: pubVersion,
+                groupId: artifactGroupId,
+                artifactId: baseArtifactId,
+                mavenUrl: vendordepMavenUrl,
+                jsonUrl: vendordepJsonUrl
+            )
+        }
+    }
+}
+
+tasks.register('vendordepJsonZip', Zip) {
+    dependsOn tasks.named('vendordepJson')
+    destinationDirectory = outputsFolder
+    archiveBaseName = 'vendordepJson'
+
+    from("$buildDir/vendordep/$templateVendorFile") {
+        into '/'
+    }
+}
+
+addTaskToCopyAllOutputs(tasks.named('cppHeadersZip').get())
+addTaskToCopyAllOutputs(tasks.named('cppSourceZip').get())
+addTaskToCopyAllOutputs(tasks.named('vendordepJsonZip').get())
+
+tasks.named('build') {
+    dependsOn tasks.named('copyAllOutputs')
+}
+
+publishing {
+    repositories {
+        maven {
+            url = releasesRepoUrl
+        }
+    }
+}
+
+model {
+    publishing {
+        def nativeArchives = createComponentZipTasks($.components, ['AdvantageKitCpp'], zipBaseName, Zip, project, includeStandardZipFormat)
+
+        publications {
+            cpp(MavenPublication) {
+                nativeArchives.each {
+                    artifact it
+                }
+                artifact tasks.named('cppHeadersZip').get()
+                artifact tasks.named('cppSourceZip').get()
+
+                artifactId = "${baseArtifactId}-cpp"
+                groupId = artifactGroupId
+                version = pubVersion
+            }
+        }
+    }
+}

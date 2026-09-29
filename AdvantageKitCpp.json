@@ -1,0 +1,32 @@
+{
+    "fileName": "AdvantageKitCpp.json",
+    "name": "AdvantageKit C++",
+    "version": "${version}",
+    "frcYear": "2026",
+    "uuid": "5fd90d86-32bd-4f56-b5f7-fc04f0a846ed",
+    "mavenUrls": [
+        "${mavenUrl}"
+    ],
+    "jsonUrl": "${jsonUrl}",
+    "javaDependencies": [],
+    "jniDependencies": [],
+    "cppDependencies": [
+        {
+            "groupId": "${groupId}",
+            "artifactId": "${artifactId}-cpp",
+            "version": "${version}",
+            "libName": "AdvantageKitCpp",
+            "headerClassifier": "headers",
+            "sharedLibrary": false,
+            "skipInvalidPlatforms": true,
+            "binaryPlatforms": [
+                "windowsx86-64",
+                "linuxarm64",
+                "linuxx86-64",
+                "linuxathena",
+                "linuxarm32",
+                "osxuniversal"
+            ]
+        }
+    ]
+}

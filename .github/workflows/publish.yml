@@ -1,0 +1,206 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to publish, such as 0.1.0-alpha
+        required: true
+        type: string
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+env:
+  PUBLISH_VERSION: ${{ inputs.version }}
+  PUBLISH_GROUP: com.ethanye.advantagekit
+  ORG_GRADLE_PROJECT_publishVersion: ${{ inputs.version }}
+  ORG_GRADLE_PROJECT_publishGroup: com.ethanye.advantagekit
+  ORG_GRADLE_PROJECT_vendordepMavenUrl: https://thanewye.github.io/advantagekit-cpp/maven
+  ORG_GRADLE_PROJECT_vendordepJsonUrl: https://thanewye.github.io/advantagekit-cpp/AdvantageKitCpp.json
+
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      pages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gradle/actions/wrapper-validation@v4
+      - name: Verify GitHub Pages configuration
+        uses: actions/configure-pages@v5
+      - name: Validate version
+        shell: bash
+        run: |
+          if [[ ! "$PUBLISH_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid version: $PUBLISH_VERSION" >&2
+            exit 1
+          fi
+
+  build-linux:
+    needs: validate
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - container: wpilib/roborio-cross-ubuntu:2025-22.04
+            name: roboRIO
+            options: -Ponlylinuxathena
+          - container: wpilib/raspbian-cross-ubuntu:bookworm-22.04
+            name: Linux ARM32
+            options: -Ponlylinuxarm32
+          - container: wpilib/aarch64-cross-ubuntu:bookworm-22.04
+            name: Linux ARM64
+            options: -Ponlylinuxarm64
+          - container: wpilib/ubuntu-base:22.04
+            name: Linux x86-64
+            options: ''
+    name: Build ${{ matrix.name }}
+    runs-on: ubuntu-22.04
+    container: ${{ matrix.container }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - run: ./gradlew build -PreleaseMode ${{ matrix.options }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: build/allOutputs
+
+  build-desktop:
+    needs: validate
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            name: Windows x86-64
+            architecture: x64
+          - os: macos-14
+            name: macOS universal
+            architecture: aarch64
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          architecture: ${{ matrix.architecture }}
+      - run: ./gradlew build -PreleaseMode -Pbuildalldesktop
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: build/allOutputs
+
+  combine:
+    needs: [build-linux, build-desktop]
+    permissions:
+      contents: read
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: wpilibsuite/build-tools
+      - uses: actions/download-artifact@v4
+        with:
+          path: combiner/products/build/allOutputs
+      - name: Combine platform outputs
+        shell: bash
+        run: rsync -a --delete combiner/products/build/allOutputs/*/* combiner/products/build/allOutputs/
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Create Maven repository
+        run: ./gradlew publish -Pthirdparty -PreleaseRepoPublish
+        working-directory: combiner
+      - name: Assemble Pages candidate
+        shell: bash
+        run: |
+          mkdir -p pages/maven
+          rsync -a "$HOME/releases/maven/release/" pages/maven/
+          unzip -q combiner/products/build/allOutputs/vendordepJson.zip -d pages
+          cp pages/AdvantageKitCpp.json "pages/AdvantageKitCpp-$PUBLISH_VERSION.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pages candidate
+          path: pages
+          retention-days: 7
+
+  publish:
+    needs: combine
+    permissions:
+      contents: write
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: Pages candidate
+          path: candidate
+      - name: Preserve releases and update Pages content
+        shell: bash
+        run: |
+          pages_source="$RUNNER_TEMP/advantagekit-cpp-pages"
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null; then
+            git fetch origin gh-pages
+            git worktree add --detach "$pages_source" origin/gh-pages
+            git -C "$pages_source" switch -C gh-pages
+          else
+            git worktree add --detach "$pages_source"
+            git -C "$pages_source" switch --orphan gh-pages
+          fi
+
+          group_path="${PUBLISH_GROUP//./\/}"
+          version_path="$pages_source/maven/$group_path/advantagekit-cpp/$PUBLISH_VERSION"
+          if [[ -e "$version_path" ]]; then
+            echo "Version $PUBLISH_VERSION is already published." >&2
+            exit 1
+          fi
+
+          mkdir -p "$pages_source/maven"
+          rsync -a candidate/maven/ "$pages_source/maven/"
+          cp candidate/AdvantageKitCpp.json "$pages_source/AdvantageKitCpp.json"
+          cp "candidate/AdvantageKitCpp-$PUBLISH_VERSION.json" "$pages_source/"
+          touch "$pages_source/.nojekyll"
+
+          git -C "$pages_source" config user.name github-actions[bot]
+          git -C "$pages_source" config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git -C "$pages_source" add .
+          git -C "$pages_source" commit -m "Publish AdvantageKit C++ $PUBLISH_VERSION"
+          git -C "$pages_source" push origin gh-pages
+
+          mkdir pages-site
+          rsync -a --exclude=.git "$pages_source/" pages-site/
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: pages-site
+
+  deploy:
+    needs: publish
+    permissions:
+      actions: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

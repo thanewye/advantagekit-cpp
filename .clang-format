@@ -1,0 +1,85 @@
+---
+Language: Cpp
+Standard: c++20
+
+# --- Indentation ---
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+# Indent inside namespaces
+NamespaceIndentation: All
+# public:/private: at same column as the class keyword
+AccessModifierOffset: -4
+ContinuationIndentWidth: 4
+
+# --- Line length ---
+ColumnLimit: 160
+
+# --- Braces (K&R: opening brace on same line) ---
+BreakBeforeBraces: Attach
+
+# --- Pointers and references attach to the type ---
+PointerAlignment: Left
+ReferenceAlignment: Left
+
+# --- Short constructs ---
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+AllowShortLambdasOnASingleLine: All
+# template<Foo> not template <Foo>
+SpaceAfterTemplateKeyword: false
+
+# --- Constructor initializer lists: leading-comma style ---
+#   Foo() : a(1)      ->  Foo()
+#         , b(2) {}         : a(1)
+#                           , b(2) {}
+BreakConstructorInitializers: BeforeComma
+ConstructorInitializerIndentWidth: 4
+PackConstructorInitializers: Never
+
+# --- Templates ---
+# requires clause on the same line as template<>, function/class on next line
+RequiresClausePosition: WithPreceding
+IndentRequiresClause: false
+BreakTemplateDeclarations: Leave
+
+# --- Includes ---
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+# Identifies the "corresponding header" so it stays first (priority 0)
+IncludeIsMainRegex: '(_test)?$'
+IncludeCategories:
+  # 0. Precompiled header — must stay the first include for Gradle's preCompiledHeader
+  - Regex:    '^"pch\.h"$'
+    Priority: -1
+    SortPriority: -1
+  # 1. STL — angle-bracket headers from the C++ standard library
+  - Regex:    '^<(algorithm|array|atomic|bit|cassert|cctype|charconv|chrono|cmath|compare|complex|concepts|condition_variable|coroutine|cstddef|cstdint|cstdio|cstdlib|cstring|ctime|deque|exception|filesystem|format|fstream|functional|future|initializer_list|iomanip|ios|iosfwd|iostream|istream|iterator|limits|list|locale|map|memory|mutex|new|numbers|numeric|optional|ostream|queue|random|ranges|ratio|regex|set|shared_mutex|source_location|span|sstream|stack|stdexcept|stop_token|streambuf|string|string_view|system_error|thread|tuple|type_traits|typeindex|typeinfo|unordered_map|unordered_set|utility|variant|vector)>'
+    Priority: 1
+    SortPriority: 1
+  # 2. Vendor — all other angle-bracket headers (frc, wpi, ctre, units, gtest, …)
+  - Regex:    '^<'
+    Priority: 2
+    SortPriority: 2
+  # 3. Project — quoted headers
+  - Regex:    '^"'
+    Priority: 3
+    SortPriority: 3
+
+# --- Spacing ---
+SpaceBeforeParens: ControlStatements
+SpacesInAngles: Never
+SpacesInContainerLiterals: false
+SpaceInEmptyBlock: false
+
+# --- Alignment ---
+AlignAfterOpenBracket: Align
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 0
+
+# --- Misc ---
+Cpp11BracedListStyle: true
+# Adds/maintains "} // namespace foo" comments
+FixNamespaceComments: true
+...
