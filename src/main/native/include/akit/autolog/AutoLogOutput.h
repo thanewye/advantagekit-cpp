@@ -49,9 +49,8 @@
     }                                                                                                                                                          \
     ::akit::AutoLogRegistrationHandle autoLogSupplierRegistration_##name = [this] {                                                                            \
         auto resolvedKey = AutoLogResolvedKey_##name();                                                                                                        \
-        return ::akit::AutoLogRegistrationHandle(resolvedKey, [this, key = std::move(resolvedKey)] {                                                           \
-            ::akit::detail::RecordAutoLoggedValue(key, AutoLogSupplierValue_##name(), unit_type{}, serial_arg);                                                \
-        });                                                                                                                                                    \
+        return ::akit::AutoLogRegistrationHandle(                                                                                                              \
+            resolvedKey, [this, key = resolvedKey] { ::akit::detail::RecordAutoLoggedValue(key, AutoLogSupplierValue_##name(), unit_type{}, serial_arg); });   \
     }()
 
 #define AKIT_AUTOLOG_OUTPUT_SUPPLIER_4(name, expr, key_arg, unit_type)                                                                                         \

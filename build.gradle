@@ -8,9 +8,10 @@ plugins {
 
 ext.wpilibVersion = '2026.2.1'
 def hostOsName = System.getProperty('os.name')
-def supportsPrecompiledHeaders = !hostOsName.startsWith('Mac') && !hostOsName.startsWith('Windows')
-def hostPlatformName = hostOsName.startsWith('Mac') ? 'osxuniversal' : hostOsName.startsWith('Windows') ? 'windowsx86-64' : 'linuxx86-64'
-def disableAccessControlArgument = hostOsName.startsWith('Windows') ? '/d1noAccessControl' : '-fno-access-control'
+def isWindowsHost = hostOsName.startsWith('Windows')
+def supportsPrecompiledHeaders = !hostOsName.startsWith('Mac') && !isWindowsHost
+def hostPlatformName = hostOsName.startsWith('Mac') ? 'osxuniversal' : isWindowsHost ? 'windowsx86-64' : 'linuxx86-64'
+def cppStandardArgument = isWindowsHost ? '/std:c++20' : '-std=c++20'
 
 repositories {
     mavenCentral()
@@ -51,8 +52,7 @@ model {
             }
 
             binaries.all {
-                cppCompiler.args '-std=c++20'
-                cppCompiler.args disableAccessControlArgument
+                cppCompiler.args cppStandardArgument
             }
 
             nativeUtils.useRequiredLibrary(it, 'wpilib_shared')
@@ -71,8 +71,7 @@ model {
             }
 
             binaries.all {
-                cppCompiler.args '-std=c++20'
-                cppCompiler.args disableAccessControlArgument
+                cppCompiler.args cppStandardArgument
                 lib library: 'AdvantageKitCpp', linkage: 'static'
                 if (targetPlatform.name != hostPlatformName) {
                     buildable = false
