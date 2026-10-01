@@ -13,6 +13,7 @@
 #include <frc/util/Color8Bit.h>
 #include <magic_enum/magic_enum.hpp>
 #include <units/base.h>
+#include <wpi/protobuf/Protobuf.h>
 #include <wpi/struct/Struct.h>
 
 #include "akit/log/LogStorage.h"
@@ -43,6 +44,8 @@ namespace akit {
             std::ratio_equal_v<typename units::traits::unit_traits<U>::conversion_ratio, std::ratio<1>> &&
             std::ratio_equal_v<typename units::traits::unit_traits<U>::pi_exponent_ratio, std::ratio<0>> &&
             std::ratio_equal_v<typename units::traits::unit_traits<U>::translation_ratio, std::ratio<0>>;
+
+        template<typename T> concept ProtobufOnlySerializable = wpi::ProtobufSerializable<T> && !wpi::StructSerializable<T>;
     } // namespace detail
 
     class LoggableInputs;
@@ -165,8 +168,17 @@ namespace akit {
             }
         }
 
+        template<detail::ProtobufOnlySerializable T> void Put(const std::string& key, const T& value) const {
+            wpi::ProtobufMessage<T> message;
+            AddProtobufSchema(message);
+            std::vector<uint8_t> buf;
+            if (!message.Pack(buf, value)) return;
+            Put(key, LogValue{std::move(buf), message.GetTypeString()});
+        }
+
         template<typename T>
-        requires std::is_aggregate_v<T> && (!std::is_array_v<T>) && (!wpi::StructSerializable<T>) && (!std::derived_from<T, LoggableInputs>)
+        requires std::is_aggregate_v<T> && (!std::is_array_v<T>) && (!wpi::StructSerializable<T>) && (!wpi::ProtobufSerializable<T>) &&
+                 (!std::derived_from<T, LoggableInputs>)
         void Put(const std::string& key, const T& value) const;
 
         /* --------------------GETTERS-------------------- */
@@ -308,8 +320,19 @@ namespace akit {
             return result;
         }
 
+        template<detail::ProtobufOnlySerializable T> [[nodiscard]] T Get(std::string_view key, T defaultValue) const {
+            const LogValue* lv = Get(key);
+            if (!lv || lv->type != LoggableType::kRaw) return defaultValue;
+            wpi::ProtobufMessage<T> message;
+            if (lv->customTypeStr != message.GetTypeString()) return defaultValue;
+            auto unpacked = message.Unpack(std::get<std::vector<uint8_t>>(lv->value));
+            if (!unpacked.has_value()) return defaultValue;
+            return std::move(*unpacked);
+        }
+
         template<typename T>
-        requires std::is_aggregate_v<T> && (!std::is_array_v<T>) && (!wpi::StructSerializable<T>) && (!std::derived_from<T, LoggableInputs>)
+        requires std::is_aggregate_v<T> && (!std::is_array_v<T>) && (!wpi::StructSerializable<T>) && (!wpi::ProtobufSerializable<T>) &&
+                 (!std::derived_from<T, LoggableInputs>)
         T Get(std::string_view key, T defaultValue) const;
 
         // raw value accessor w/ no default, returns nullptr (pls don't use this)
@@ -352,6 +375,15 @@ namespace akit {
                 std::vector<uint8_t> bytes(schema.begin(), schema.end());
                 storage_->values.emplace(schemaKey, LogValue{std::move(bytes), "structschema"});
             });
+        }
+
+        template<detail::ProtobufOnlySerializable T> void AddProtobufSchema(wpi::ProtobufMessage<T>& message) const {
+            message.ForEachProtobufDescriptor(
+                [this](std::string_view typeStr) { return storage_->values.contains("/.schema/" + std::string(typeStr)); },
+                [this](std::string_view typeStr, std::span<const uint8_t> descriptor) {
+                    std::vector<uint8_t> bytes(descriptor.begin(), descriptor.end());
+                    storage_->values.emplace("/.schema/" + std::string(typeStr), LogValue{std::move(bytes), "proto:FileDescriptorProto"});
+                });
         }
 
         template<typename T> T GetTyped(const std::string_view key, T defaultValue) const {

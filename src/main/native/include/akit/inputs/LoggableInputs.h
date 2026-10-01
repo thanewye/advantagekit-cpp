@@ -58,13 +58,17 @@ namespace akit {
         detail::from_log_impl(obj, table, std::make_index_sequence<boost::pfr::tuple_size_v<T>>{});
     }
 
-    template<typename T> requires std::is_aggregate_v<T> && (!std::is_array_v<T>) && (!wpi::StructSerializable<T>) && (!std::derived_from<T, LoggableInputs>)
+    template<typename T>
+    requires std::is_aggregate_v<T> && (!std::is_array_v<T>) && (!wpi::StructSerializable<T>) && (!wpi::ProtobufSerializable<T>) &&
+             (!std::derived_from<T, LoggableInputs>)
     void LogTable::Put(const std::string& key, const T& value) const {
         auto subtable = GetSubtable(key);
         ToLog(value, subtable);
     }
 
-    template<typename T> requires std::is_aggregate_v<T> && (!std::is_array_v<T>) && (!wpi::StructSerializable<T>) && (!std::derived_from<T, LoggableInputs>)
+    template<typename T>
+    requires std::is_aggregate_v<T> && (!std::is_array_v<T>) && (!wpi::StructSerializable<T>) && (!wpi::ProtobufSerializable<T>) &&
+             (!std::derived_from<T, LoggableInputs>)
     T LogTable::Get(std::string_view key, T defaultValue) const {
         auto subtable = GetSubtable(key);
         FromLog(defaultValue, subtable);

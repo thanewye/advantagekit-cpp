@@ -168,6 +168,11 @@ namespace akit {
             LogTable(currentStorage_).GetSubtable(HasReplaySource() ? "ReplayOutputs" : "RealOutputs").Put(key, value);
         }
 
+        template<detail::ProtobufOnlySerializable T> static void RecordOutput(const std::string& key, const T& value) {
+            if (!running_) return;
+            LogTable(currentStorage_).GetSubtable(HasReplaySource() ? "ReplayOutputs" : "RealOutputs").Put(key, value);
+        }
+
         template<wpi::StructSerializable T> static void RecordOutputStruct(const std::string& key, const T& value) {
             if (!running_) return;
             AddStructSchema<T>();

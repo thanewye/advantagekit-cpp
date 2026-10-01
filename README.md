@@ -13,6 +13,7 @@ This is a personal project. It is not affiliated with or endorsed by Littleton R
 - Driver Station, power distribution, system and radio telemetry
 - Replayable NetworkTables inputs and dashboard choosers
 - Structured output logging and automatic output registration
+- Protobuf logging for types without a struct serializer
 - Logged mechanism visualization
 
 ## Usage

@@ -7,6 +7,7 @@
 #include <vector>
 
 #include <frc/geometry/Rotation2d.h>
+#include <frc/trajectory/Trajectory.h>
 #include <gtest/gtest.h>
 #include <units/angle.h>
 #include <units/area.h>
@@ -103,6 +104,21 @@ namespace {
             wpi::PackStruct(std::span{bytes}.subspan(i * elemSize, elemSize), rotations[i]);
         }
         return bytes;
+    }
+
+    frc::Trajectory MakeTrajectory() {
+        return frc::Trajectory{std::vector<frc::Trajectory::State>{
+            {0.0_s, 0.0_mps, 1.0_mps_sq, frc::Pose2d{1.0_m, 2.0_m, frc::Rotation2d{0.5_rad}}, units::curvature_t{0.0}},
+            {1.5_s, 1.5_mps, 0.0_mps_sq, frc::Pose2d{3.0_m, 4.0_m, frc::Rotation2d{1.0_rad}}, units::curvature_t{0.25}},
+        }};
+    }
+
+    size_t CountProtobufSchemas(const LogStorage& storage) {
+        size_t count = 0;
+        for (const auto& [key, value] : storage.values) {
+            if (key.starts_with("/.schema/proto:") && value.customTypeStr == "proto:FileDescriptorProto") count++;
+        }
+        return count;
     }
 
     TEST(LogTableStructTest, StructRoundTripSucceedsWhenTypeMatches) {
@@ -405,6 +421,67 @@ namespace {
         EXPECT_DOUBLE_EQ(std::get<double>(stored->value), 2.0);
     }
 
+    TEST(LogTableProtobufTest, ProtobufOnlyTypeRoundTripsWithProtoTypeAndSchemas) {
+        LogStorage storage;
+        LogTable table(storage);
+        const frc::Trajectory expected = MakeTrajectory();
+
+        table.Put("trajectory", expected);
+
+        const LogValue* stored = table.Get("trajectory");
+        ASSERT_NE(stored, nullptr);
+        EXPECT_EQ(stored->type, akit::LoggableType::kRaw);
+        EXPECT_EQ(stored->customTypeStr, wpi::ProtobufMessage<frc::Trajectory>{}.GetTypeString());
+        EXPECT_TRUE(stored->customTypeStr.starts_with("proto:"));
+        EXPECT_GE(CountProtobufSchemas(storage), 2u);
+
+        EXPECT_EQ(table.Get("trajectory", frc::Trajectory{}), expected);
+    }
+
+    TEST(LogTableProtobufTest, ProtobufOnlyAggregateUsesProtobufInsteadOfSubtable) {
+        LogStorage storage;
+        LogTable table(storage);
+        const frc::Trajectory::State expected = MakeTrajectory().States().back();
+
+        table.Put("state", expected);
+
+        const LogValue* stored = table.Get("state");
+        ASSERT_NE(stored, nullptr);
+        EXPECT_EQ(stored->customTypeStr, wpi::ProtobufMessage<frc::Trajectory::State>{}.GetTypeString());
+        EXPECT_EQ(table.Get("state", frc::Trajectory::State{}), expected);
+    }
+
+    TEST(LogTableProtobufTest, TypeWithStructAndProtobufLogsAsStruct) {
+        LogStorage storage;
+        LogTable table(storage);
+
+        table.Put("rotation", frc::Rotation2d{1.0_rad});
+
+        EXPECT_EQ(table.Get("rotation")->customTypeStr, wpi::GetStructTypeString<frc::Rotation2d>());
+        EXPECT_EQ(CountProtobufSchemas(storage), 0u);
+    }
+
+    TEST(LogTableProtobufTest, ProtobufReplayReturnsDefaultOnWrongCustomType) {
+        LogStorage storage;
+        LogTable table(storage);
+        std::vector<uint8_t> bytes;
+        wpi::ProtobufMessage<frc::Trajectory>{}.Pack(bytes, MakeTrajectory());
+
+        table.Put("trajectory", LogValue{std::move(bytes), "proto:wrong.Type"});
+
+        EXPECT_EQ(table.Get("trajectory", frc::Trajectory{}), frc::Trajectory{});
+    }
+
+    TEST(LogTableProtobufTest, ProtobufReplayReturnsDefaultOnMalformedBytes) {
+        LogStorage storage;
+        LogTable table(storage);
+        const std::string typeString = wpi::ProtobufMessage<frc::Trajectory>{}.GetTypeString();
+
+        table.Put("trajectory", LogValue{std::vector<uint8_t>{0xFF, 0xFF, 0xFF}, typeString});
+
+        EXPECT_EQ(table.Get("trajectory", frc::Trajectory{}), frc::Trajectory{});
+    }
+
     TEST(LoggerParityTest, MeasureRecordOutputUsesBaseUnits) {
         EnsureLoggedRobotValidationSatisfied();
         Logger::Clear();
@@ -416,6 +493,22 @@ namespace {
         ASSERT_TRUE(stored.unitStr.has_value());
         EXPECT_EQ(*stored.unitStr, "Meter");
         EXPECT_NEAR(std::get<double>(stored.value), 0.3048, 1e-9);
+
+        Logger::End();
+        Logger::Clear();
+    }
+
+    TEST(LoggerParityTest, ProtobufRecordOutputLogsProtoTypeAndSchemas) {
+        EnsureLoggedRobotValidationSatisfied();
+        Logger::Clear();
+        Logger::Start();
+
+        Logger::RecordOutput("Trajectory", MakeTrajectory());
+
+        const auto& storage = Logger::GetCurrentStorage();
+        const auto& stored = storage.values.at("/RealOutputs/Trajectory");
+        EXPECT_EQ(stored.customTypeStr, wpi::ProtobufMessage<frc::Trajectory>{}.GetTypeString());
+        EXPECT_GE(CountProtobufSchemas(storage), 2u);
 
         Logger::End();
         Logger::Clear();
