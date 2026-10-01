@@ -18,6 +18,33 @@
 #include "akit/log/LogStorage.h"
 
 namespace akit {
+    namespace detail {
+        template<typename BaseUnitType> constexpr std::string_view JavaUnitNameForDimension() {
+            namespace category = units::category;
+            if constexpr (std::same_as<BaseUnitType, category::length_unit>) return "Meter";
+            else if constexpr (std::same_as<BaseUnitType, category::time_unit>) return "Second";
+            else if constexpr (std::same_as<BaseUnitType, category::mass_unit>) return "Kilogram";
+            else if constexpr (std::same_as<BaseUnitType, category::angle_unit>) return "Radian";
+            else if constexpr (std::same_as<BaseUnitType, category::current_unit>) return "Amp";
+            else if constexpr (std::same_as<BaseUnitType, category::temperature_unit>) return "Kelvin";
+            else if constexpr (std::same_as<BaseUnitType, category::voltage_unit>) return "Volt";
+            else if constexpr (std::same_as<BaseUnitType, category::force_unit>) return "Newton";
+            else if constexpr (std::same_as<BaseUnitType, category::power_unit>) return "Watt";
+            else if constexpr (std::same_as<BaseUnitType, category::frequency_unit>) return "Hertz";
+            else if constexpr (std::same_as<BaseUnitType, category::energy_unit>) return "Joule";
+            else if constexpr (std::same_as<BaseUnitType, category::velocity_unit>) return "Meter per Second";
+            else if constexpr (std::same_as<BaseUnitType, category::acceleration_unit>) return "Meter per Second per Second";
+            else if constexpr (std::same_as<BaseUnitType, category::angular_velocity_unit>) return "Radian per Second";
+            else if constexpr (std::same_as<BaseUnitType, category::angular_acceleration_unit>) return "Radian per Second per Second";
+            else return {};
+        }
+
+        template<typename U> inline constexpr bool kIsBaseScaleUnit =
+            std::ratio_equal_v<typename units::traits::unit_traits<U>::conversion_ratio, std::ratio<1>> &&
+            std::ratio_equal_v<typename units::traits::unit_traits<U>::pi_exponent_ratio, std::ratio<0>> &&
+            std::ratio_equal_v<typename units::traits::unit_traits<U>::translation_ratio, std::ratio<0>>;
+    } // namespace detail
+
     class LoggableInputs;
 
     class LogTable {
@@ -83,11 +110,17 @@ namespace akit {
             }
         }
 
-        // wpilib strong units, convenient that they have a name
+        // wpilib strong units, logged in base units with java unit names
         template<typename U> void Put(const std::string& key, units::unit_t<U> value) const {
-            using BaseUnit = units::unit<std::ratio<1>, typename units::traits::unit_traits<U>::base_unit_type>;
+            using BaseUnitType = typename units::traits::unit_traits<U>::base_unit_type;
+            using BaseUnit = units::unit<std::ratio<1>, BaseUnitType>;
             const auto baseValue = value.template convert<BaseUnit>();
-            Put(key, baseValue.value(), baseValue.name());
+            constexpr std::string_view unitName = detail::JavaUnitNameForDimension<BaseUnitType>();
+            if constexpr (unitName.empty()) {
+                Put(key, baseValue.value());
+            } else {
+                Put(key, baseValue.value(), unitName);
+            }
         }
 
         // wpilib colors, as hex string

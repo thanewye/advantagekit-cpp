@@ -3,6 +3,7 @@
 
 #include <frc/geometry/Rotation2d.h>
 #include <gtest/gtest.h>
+#include <units/current.h>
 #include <units/length.h>
 #include <wpi/struct/Struct.h>
 
@@ -68,6 +69,17 @@ namespace {
         UnitAutoLog() { distance = 4.25; }
 
         AUTOLOG_OUTPUT(double, distance, akit::DefaultKey, units::meter_t);
+    };
+
+    class ExplicitUnitVariantsAutoLog {
+    public:
+        ExplicitUnitVariantsAutoLog() {
+            current = 12.5;
+            height = 6.0;
+        }
+
+        AUTOLOG_OUTPUT(double, current, akit::DefaultKey, units::ampere_t);
+        AUTOLOG_OUTPUT(double, height, akit::DefaultKey, units::inch_t);
     };
 
     class StrongUnitAutoLog {
@@ -166,8 +178,31 @@ namespace {
 
         const auto& stored = Logger::GetCurrentStorage().values.at("/RealOutputs/UnitAutoLog/Distance");
         ASSERT_TRUE(stored.unitStr.has_value());
-        EXPECT_EQ(*stored.unitStr, units::meter_t{0}.name());
+        EXPECT_EQ(*stored.unitStr, "Meter");
         EXPECT_DOUBLE_EQ(std::get<double>(stored.value), 4.25);
+
+        Logger::End();
+        Logger::Clear();
+    }
+
+    TEST(AutoLogOutputManagerTest, ExplicitBaseUnitUsesJavaNameAndOtherUnitsKeepRawValueAndName) {
+        EnsureLoggedRobotValidationSatisfied();
+        Logger::Clear();
+
+        ExplicitUnitVariantsAutoLog value;
+        Logger::Start();
+        Logger::PeriodicAfterUser();
+
+        const auto& values = Logger::GetCurrentStorage().values;
+        const auto& current = values.at("/RealOutputs/ExplicitUnitVariantsAutoLog/Current");
+        ASSERT_TRUE(current.unitStr.has_value());
+        EXPECT_EQ(*current.unitStr, "Amp");
+        EXPECT_DOUBLE_EQ(std::get<double>(current.value), 12.5);
+
+        const auto& height = values.at("/RealOutputs/ExplicitUnitVariantsAutoLog/Height");
+        ASSERT_TRUE(height.unitStr.has_value());
+        EXPECT_EQ(*height.unitStr, units::inch_t{0}.name());
+        EXPECT_DOUBLE_EQ(std::get<double>(height.value), 6.0);
 
         Logger::End();
         Logger::Clear();
@@ -183,7 +218,7 @@ namespace {
 
         const auto& stored = Logger::GetCurrentStorage().values.at("/RealOutputs/StrongUnitAutoLog/Distance");
         ASSERT_TRUE(stored.unitStr.has_value());
-        EXPECT_EQ(*stored.unitStr, units::meter_t{0}.name());
+        EXPECT_EQ(*stored.unitStr, "Meter");
         EXPECT_NEAR(std::get<double>(stored.value), 0.3048, 1e-9);
 
         Logger::End();
@@ -223,7 +258,7 @@ namespace {
 
         const auto& distance = values.at("/RealOutputs/SupplierAutoLog/DistanceMeters");
         ASSERT_TRUE(distance.unitStr.has_value());
-        EXPECT_EQ(*distance.unitStr, units::meter_t{0}.name());
+        EXPECT_EQ(*distance.unitStr, "Meter");
 
         const auto& mode = values.at("/RealOutputs/Supplier/Mode");
         EXPECT_EQ(mode.customTypeStr, wpi::GetStructTypeString<TestStructuredMode>());

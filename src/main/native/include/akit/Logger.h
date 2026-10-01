@@ -152,7 +152,10 @@ namespace akit {
             RecordOutput2D<E>(key, values);
         }
 
-        template<typename U> static void RecordOutput(const std::string& key, units::unit_t<U> value) { RecordOutput(key, value.value(), value.name()); }
+        template<typename U> static void RecordOutput(const std::string& key, units::unit_t<U> value) {
+            if (!running_) return;
+            LogTable(currentStorage_).GetSubtable(HasReplaySource() ? "ReplayOutputs" : "RealOutputs").Put(key, value);
+        }
 
         static void RecordOutput(const std::string& key, frc::Color value) { RecordOutput(key, std::string_view{value.HexString()}); }
 

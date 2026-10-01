@@ -9,7 +9,11 @@
 #include <frc/geometry/Rotation2d.h>
 #include <gtest/gtest.h>
 #include <units/angle.h>
+#include <units/area.h>
+#include <units/current.h>
 #include <units/length.h>
+#include <units/mass.h>
+#include <units/velocity.h>
 #include <wpi/struct/Struct.h>
 
 #include "akit/LoggedRobot.h"
@@ -366,11 +370,55 @@ namespace {
         const LogValue* stored = table.Get("distance");
         ASSERT_NE(stored, nullptr);
         ASSERT_TRUE(stored->unitStr.has_value());
-        EXPECT_EQ(*stored->unitStr, units::meter_t{0}.name());
+        EXPECT_EQ(*stored->unitStr, "Meter");
         EXPECT_NEAR(std::get<double>(stored->value), 0.3048, 1e-9);
 
         const auto actualFeet = table.Get("distance", 0.0_ft);
         EXPECT_NEAR(actualFeet.value(), expectedFeet.value(), 1e-9);
+    }
+
+    TEST(LogTableParityTest, MeasurePutUsesJavaBaseUnitNames) {
+        LogStorage storage;
+        LogTable table(storage);
+
+        table.Put("current", 2.0_A);
+        table.Put("mass", 1500.0_g);
+        table.Put("velocity", 3.0_fps);
+        table.Put("angle", 180.0_deg);
+
+        EXPECT_EQ(*table.Get("current")->unitStr, "Amp");
+        EXPECT_EQ(*table.Get("mass")->unitStr, "Kilogram");
+        EXPECT_NEAR(std::get<double>(table.Get("mass")->value), 1.5, 1e-9);
+        EXPECT_EQ(*table.Get("velocity")->unitStr, "Meter per Second");
+        EXPECT_EQ(*table.Get("angle")->unitStr, "Radian");
+    }
+
+    TEST(LogTableParityTest, MeasurePutWithUnmappedDimensionLogsNoUnit) {
+        LogStorage storage;
+        LogTable table(storage);
+
+        table.Put("area", 2.0_sq_m);
+
+        const LogValue* stored = table.Get("area");
+        ASSERT_NE(stored, nullptr);
+        EXPECT_FALSE(stored->unitStr.has_value());
+        EXPECT_DOUBLE_EQ(std::get<double>(stored->value), 2.0);
+    }
+
+    TEST(LoggerParityTest, MeasureRecordOutputUsesBaseUnits) {
+        EnsureLoggedRobotValidationSatisfied();
+        Logger::Clear();
+        Logger::Start();
+
+        Logger::RecordOutput("Distance", 1.0_ft);
+
+        const auto& stored = Logger::GetCurrentStorage().values.at("/RealOutputs/Distance");
+        ASSERT_TRUE(stored.unitStr.has_value());
+        EXPECT_EQ(*stored.unitStr, "Meter");
+        EXPECT_NEAR(std::get<double>(stored.value), 0.3048, 1e-9);
+
+        Logger::End();
+        Logger::Clear();
     }
 
     TEST(LoggerParityTest, PersistentSnapshotsRetainUnchangedValuesAcrossCycles) {

@@ -95,6 +95,20 @@ namespace akit {
         inline constexpr bool kSupportsExplicitUnit =
             (std::same_as<std::remove_cvref_t<T>, float> || std::same_as<std::remove_cvref_t<T>, double>) && NamedUnit<Unit>;
 
+        template<NamedUnit Unit> std::string_view ExplicitUnitName(const Unit& unit) {
+            if constexpr (units::traits::is_unit_t<Unit>::value) {
+                using UnitType = typename units::traits::unit_t_traits<Unit>::unit_type;
+                constexpr std::string_view javaName = JavaUnitNameForDimension<typename units::traits::unit_traits<UnitType>::base_unit_type>();
+                if constexpr (kIsBaseScaleUnit<UnitType> && !javaName.empty()) {
+                    return javaName;
+                } else {
+                    return unit.name();
+                }
+            } else {
+                return unit.name();
+            }
+        }
+
         template<typename T> inline constexpr bool kSupportsForceSerializable = wpi::StructSerializable<std::remove_cvref_t<T>>;
 
         constexpr std::string_view ExtractEnclosingClassName(const std::string_view prettyFunction, const std::string_view methodMarker) {
@@ -168,7 +182,7 @@ namespace akit {
             } else {
                 static_assert(kSupportsExplicitUnit<ValueType, UnitType>,
                               "Explicit AUTOLOG_OUTPUT unit metadata is only supported for raw float/double values.");
-                Logger::RecordOutput(key, value, unit.name());
+                Logger::RecordOutput(key, value, ExplicitUnitName(unit));
             }
         }
     } // namespace detail
