@@ -62,3 +62,14 @@ private:
 ```
 
 Use `akit::wpilog::WPILOGWriter` for on-robot log storage and `akit::wpilog::WPILOGReader` with `Logger::SetReplaySource()` for replay.
+
+### Template projects
+
+C++ ports of the AdvantageKit template projects are in [`template_projects`](template_projects), with real, sim and replay modes already configured. Copy a directory to start a new robot project.
+
+- [`skeleton`](template_projects/skeleton): logger setup only
+- [`diff_drive`](template_projects/diff_drive): differential drive with Talon SRX, Talon FX or Spark motors
+- [`kitbot_2026`](template_projects/kitbot_2026): 2026 kitbot drive and superstructure
+- [`spark_swerve`](template_projects/spark_swerve): swerve with Spark Flex drive, Spark Max turn and high-frequency odometry
+- [`talonfx_swerve`](template_projects/talonfx_swerve): swerve configured from Phoenix Tuner X `TunerConstants`
+- [`vision`](template_projects/vision): Limelight and PhotonVision pose estimation

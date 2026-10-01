@@ -72,6 +72,54 @@ jobs:
           name: ${{ matrix.name }}
           path: build/allOutputs
 
+  publish-for-templates:
+    needs: wrapper-validation
+    name: Publish for template projects
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: ./gradlew installRoboRioToolchain
+        working-directory: template_projects/skeleton
+      - run: >-
+          ./gradlew publish vendordepJson -PreleaseMode
+          -PpublishVersion=0.0.0-ci
+          -PvendordepMavenUrl=file://${{ github.workspace }}/build/repos/releases
+          -PvendordepJsonUrl=https://example.invalid/AdvantageKitCpp.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Template Maven
+          path: |
+            build/repos/releases
+            build/vendordep
+
+  build-templates:
+    needs: publish-for-templates
+    strategy:
+      fail-fast: false
+      matrix:
+        template: [skeleton, diff_drive, kitbot_2026, spark_swerve, talonfx_swerve, vision]
+    name: Build template ${{ matrix.template }}
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: actions/download-artifact@v4
+        with:
+          name: Template Maven
+          path: build
+      - run: cp build/vendordep/AdvantageKitCpp.json template_projects/${{ matrix.template }}/vendordeps/AdvantageKitCpp.json
+      - run: ./gradlew installRoboRioToolchain build
+        working-directory: template_projects/${{ matrix.template }}
+
   combine:
     needs: [build-linux, build-desktop]
     runs-on: ubuntu-22.04

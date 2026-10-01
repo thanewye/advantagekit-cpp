@@ -1,0 +1,151 @@
+plugins {
+    id "cpp"
+    id "google-test-test-suite"
+    id "edu.wpi.first.GradleRIO" version "2026.2.1"
+}
+
+// Define my targets (RoboRIO) and artifacts (deployable files)
+// This is added by GradleRIO's backing project DeployUtils.
+deploy {
+    targets {
+        roborio(getTargetTypeClass('RoboRIO')) {
+            // Team number is loaded either from the .wpilib/wpilib_preferences.json
+            // or from command line. If not found an exception will be thrown.
+            // You can use getTeamOrDefault(team) instead of getTeamNumber if you
+            // want to store a team number in this file.
+            team = project.frc.getTeamNumber()
+            debug = project.frc.getDebugOrDefault(false)
+
+            artifacts {
+                // First part is artifact name, 2nd is artifact type
+                // getTargetTypeClass is a shortcut to get the class type using a string
+
+                frcCpp(getArtifactTypeClass('FRCNativeArtifact')) {
+                }
+
+                // Static files artifact
+                frcStaticFileDeploy(getArtifactTypeClass('FileTreeArtifact')) {
+                    files = project.fileTree('src/main/deploy')
+                    directory = '/home/lvuser/deploy'
+                    deleteOldFiles = false // Change to true to delete files on roboRIO that no
+                                           // longer exist in deploy directory of this project
+                }
+            }
+        }
+    }
+}
+
+def deployArtifact = deploy.targets.roborio.artifacts.frcCpp
+
+// Set this to true to enable desktop support.
+def includeDesktopSupport = true
+
+// Set to true to run simulation in debug mode
+wpi.cpp.debugSimulation = false
+
+// The sim GUI is *disabled* by default to support running
+// AdvantageKit log replay, which requires that all HAL
+// sim extensions be disabled.
+wpi.sim.addGui().defaultEnabled = false
+wpi.sim.addDriverstation()
+
+model {
+    components {
+        frcUserProgram(NativeExecutableSpec) {
+            targetPlatform wpi.platforms.roborio
+            if (includeDesktopSupport) {
+                targetPlatform wpi.platforms.desktop
+            }
+
+            sources.cpp {
+                source {
+                    srcDir 'src/main/cpp'
+                    include '**/*.cpp', '**/*.cc'
+                }
+                exportedHeaders {
+                    srcDir 'src/main/include'
+                }
+            }
+
+            // Set deploy task to deploy this component
+            deployArtifact.component = it
+
+            // Enable run tasks for this component
+            wpi.cpp.enableExternalTasks(it)
+
+            // Enable simulation for this component
+            wpi.sim.enable(it)
+            // Defining my dependencies. In this case, WPILib (+ friends), and vendor libraries.
+            wpi.cpp.vendor.cpp(it)
+            wpi.cpp.deps.wpilib(it)
+        }
+    }
+    testSuites {
+        frcUserProgramTest(GoogleTestTestSuiteSpec) {
+            testing $.components.frcUserProgram
+
+            sources.cpp {
+                source {
+                    srcDir 'src/test/cpp'
+                    include '**/*.cpp'
+                }
+            }
+
+            // Enable run tasks for this component
+            wpi.cpp.enableExternalTasks(it)
+
+            wpi.cpp.vendor.cpp(it)
+            wpi.cpp.deps.wpilib(it)
+            wpi.cpp.deps.googleTest(it)
+        }
+    }
+}
+
+// Create version file
+def buildConstantsHeader = file('src/main/include/BuildConstants.h')
+tasks.register('createVersionFile') {
+    group = 'build'
+    description = 'Writes git and build metadata to BuildConstants.h.'
+    outputs.file(buildConstantsHeader)
+    outputs.upToDateWhen { false }
+    doLast {
+        def runGit = { List<String> arguments ->
+            try {
+                def process = (['git'] + arguments).execute(null, projectDir)
+                def output = process.text.trim()
+                process.waitFor()
+                return [exitCode: process.exitValue(), output: output]
+            } catch (IOException ignored) {
+                return [exitCode: -1, output: '']
+            }
+        }
+        def gitOutputOrUnknown = { List<String> arguments ->
+            def result = runGit(arguments)
+            return result.exitCode == 0 && !result.output.isEmpty() ? result.output : 'UNKNOWN'
+        }
+        def dateFormat = new java.text.SimpleDateFormat('yyyy-MM-dd HH:mm:ss z')
+        dateFormat.setTimeZone(TimeZone.getTimeZone('America/New_York'))
+
+        def gitIsoDate = gitOutputOrUnknown(['show', '-s', '--format=%cI', 'HEAD'])
+        def gitDate = gitIsoDate == 'UNKNOWN' ? gitIsoDate : dateFormat.format(Date.from(java.time.OffsetDateTime.parse(gitIsoDate).toInstant()))
+        def dirtyExitCode = runGit(['diff', '--quiet', '--ignore-submodules=dirty']).exitCode
+        def dirty = dirtyExitCode == 0 ? 0 : (dirtyExitCode == 1 ? 1 : -1)
+
+        buildConstantsHeader.text = """// THIS IS AN AUTO GENERATED FILE. DO NOT MODIFY AS IT WILL BE REWRITTEN WHEN YOU BUILD
+#pragma once
+
+namespace BuildConstants {
+    inline constexpr const char* MAVEN_NAME = "${project.name}";
+    inline constexpr const char* GIT_SHA = "${gitOutputOrUnknown(['rev-parse', 'HEAD'])}";
+    inline constexpr const char* GIT_DATE = "${gitDate}";
+    inline constexpr const char* GIT_BRANCH = "${gitOutputOrUnknown(['rev-parse', '--abbrev-ref', 'HEAD'])}";
+    inline constexpr const char* BUILD_DATE = "${dateFormat.format(new Date())}";
+    inline constexpr int DIRTY = ${dirty};
+} // namespace BuildConstants
+"""
+    }
+}
+
+tasks.withType(CppCompile).configureEach {
+    dependsOn tasks.named('createVersionFile')
+}
