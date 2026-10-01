@@ -46,6 +46,11 @@ namespace akit {
             std::ratio_equal_v<typename units::traits::unit_traits<U>::translation_ratio, std::ratio<0>>;
 
         template<typename T> concept ProtobufOnlySerializable = wpi::ProtobufSerializable<T> && !wpi::StructSerializable<T>;
+
+        template<typename T> concept HasPrimitiveArrayOverload = std::same_as<T, bool> || std::same_as<T, uint8_t> || std::same_as<T, int> ||
+                                                                 std::same_as<T, int64_t> || std::same_as<T, float> || std::same_as<T, double>;
+
+        template<typename T> concept StructArrayElement = wpi::StructSerializable<T> && !HasPrimitiveArrayOverload<T>;
     } // namespace detail
 
     class LoggableInputs;
@@ -140,7 +145,7 @@ namespace akit {
         }
 
         // vector of aforementioned structs
-        template<wpi::StructSerializable T> void Put(const std::string& key, const std::vector<T>& values) const {
+        template<detail::StructArrayElement T> void Put(const std::string& key, const std::vector<T>& values) const {
             AddStructSchema<T>();
             const size_t elemSize = wpi::Struct<T>::GetSize();
             std::vector<uint8_t> buf(elemSize * values.size());
@@ -289,7 +294,7 @@ namespace akit {
             return wpi::UnpackStruct<T>(raw);
         }
 
-        template<wpi::StructSerializable T> [[nodiscard]] std::vector<T> Get(std::string_view key, const std::vector<T>& defaultValue = {}) const {
+        template<detail::StructArrayElement T> [[nodiscard]] std::vector<T> Get(std::string_view key, const std::vector<T>& defaultValue = {}) const {
             const LogValue* lv = Get(key);
             if (!lv || lv->type != LoggableType::kRaw) return defaultValue;
             if (lv->customTypeStr != std::string(wpi::GetStructTypeString<T>()) + "[]") return defaultValue;

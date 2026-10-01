@@ -183,7 +183,7 @@ namespace akit {
                 .Put(key, LogValue{std::move(buffer), std::string(wpi::GetStructTypeString<T>())});
         }
 
-        template<wpi::StructSerializable T> static void RecordOutput(const std::string& key, const std::vector<T>& values) {
+        template<detail::StructArrayElement T> static void RecordOutput(const std::string& key, const std::vector<T>& values) {
             if (!running_) return;
             LogTable(currentStorage_).GetSubtable(HasReplaySource() ? "ReplayOutputs" : "RealOutputs").Put(key, values);
         }

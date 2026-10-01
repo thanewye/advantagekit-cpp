@@ -30,6 +30,12 @@ struct AggregateInputs {
     double position;
 };
 
+struct VectorAggregateInputs {
+    std::vector<double> currents;
+    std::vector<int> ids;
+    std::vector<frc::Rotation2d> angles;
+};
+
 namespace {
 
     using akit::LogDataReceiver;
@@ -297,6 +303,37 @@ namespace {
         EXPECT_EQ(std::get<std::vector<int64_t>>(stored->value), (std::vector<int64_t>{1, 2, 3}));
     }
 
+    TEST(LogTableArrayParityTest, PrimitiveVectorsUseArrayStorageInsteadOfStructArrays) {
+        LogStorage storage;
+        LogTable table(storage);
+        const std::vector<double> doubles{1.5, -2.5};
+        const std::vector<float> floats{0.5f, 1.5f};
+        const std::vector<int> ints{1, -2, 3};
+        const std::vector<int64_t> longs{4, 5};
+        const std::vector<uint8_t> bytes{0x01, 0xFF};
+
+        table.Put("doubles", doubles);
+        table.Put("floats", floats);
+        table.Put("ints", ints);
+        table.Put("longs", longs);
+        table.Put("bytes", bytes);
+
+        EXPECT_EQ(table.Get("doubles")->type, akit::LoggableType::kDoubleArray);
+        EXPECT_EQ(table.Get("floats")->type, akit::LoggableType::kFloatArray);
+        EXPECT_EQ(table.Get("ints")->type, akit::LoggableType::kIntegerArray);
+        EXPECT_EQ(table.Get("longs")->type, akit::LoggableType::kIntegerArray);
+        EXPECT_EQ(table.Get("bytes")->type, akit::LoggableType::kRaw);
+        for (const char* key : {"doubles", "floats", "ints", "longs", "bytes"}) {
+            EXPECT_TRUE(table.Get(key)->customTypeStr.empty()) << key;
+        }
+
+        EXPECT_EQ(table.Get("doubles", std::vector<double>{}), doubles);
+        EXPECT_EQ(table.Get("floats", std::vector<float>{}), floats);
+        EXPECT_EQ(table.Get("ints", std::vector<int>{}), ints);
+        EXPECT_EQ(table.Get("longs", std::vector<int64_t>{}), longs);
+        EXPECT_EQ(table.Get("bytes", std::vector<uint8_t>{}), bytes);
+    }
+
     TEST(LogTableArrayParityTest, Integer2DArrayRoundTripUsesPerRowIntegerArrays) {
         LogStorage storage;
         LogTable table(storage);
@@ -364,6 +401,23 @@ namespace {
         EXPECT_EQ(actual.count, expected.count);
         EXPECT_EQ(actual.enabled, expected.enabled);
         EXPECT_DOUBLE_EQ(actual.position, expected.position);
+    }
+
+    TEST(LogTableParityTest, AggregateVectorFieldsUseArrayStorageAndRoundTrip) {
+        LogStorage storage;
+        LogTable table(storage);
+        const VectorAggregateInputs expected{{1.0, 2.0}, {7, 8}, {frc::Rotation2d{1_rad}}};
+
+        table.Put("aggregate", expected);
+
+        EXPECT_EQ(storage.values.at("/aggregate/Currents").type, akit::LoggableType::kDoubleArray);
+        EXPECT_EQ(storage.values.at("/aggregate/Ids").type, akit::LoggableType::kIntegerArray);
+        EXPECT_EQ(storage.values.at("/aggregate/Angles").customTypeStr, "struct:Rotation2d[]");
+
+        const auto actual = table.Get("aggregate", VectorAggregateInputs{});
+        EXPECT_EQ(actual.currents, expected.currents);
+        EXPECT_EQ(actual.ids, expected.ids);
+        EXPECT_EQ(actual.angles, expected.angles);
     }
 
     TEST(LogTableParityTest, Enum2DRoundTrip) {
@@ -493,6 +547,21 @@ namespace {
         ASSERT_TRUE(stored.unitStr.has_value());
         EXPECT_EQ(*stored.unitStr, "Meter");
         EXPECT_NEAR(std::get<double>(stored.value), 0.3048, 1e-9);
+
+        Logger::End();
+        Logger::Clear();
+    }
+
+    TEST(LoggerParityTest, PrimitiveVectorRecordOutputUsesArrayStorage) {
+        EnsureLoggedRobotValidationSatisfied();
+        Logger::Clear();
+        Logger::Start();
+
+        Logger::RecordOutput("Currents", std::vector<double>{1.0, 2.0});
+
+        const auto& stored = Logger::GetCurrentStorage().values.at("/RealOutputs/Currents");
+        EXPECT_EQ(stored.type, akit::LoggableType::kDoubleArray);
+        EXPECT_TRUE(stored.customTypeStr.empty());
 
         Logger::End();
         Logger::Clear();
