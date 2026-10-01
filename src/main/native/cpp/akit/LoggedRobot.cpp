@@ -32,11 +32,12 @@ namespace akit {
     }
 
     void LoggedRobot::StartCompetition() {
+        uint64_t initStart = frc::RobotController::GetFPGATime();
         RobotInit();
         if (IsSimulation()) SimulationInit();
         uint64_t initEnd = frc::RobotController::GetFPGATime();
 
-        Logger::PeriodicAfterUser(static_cast<int64_t>(initEnd), 0);
+        Logger::PeriodicAfterUser(static_cast<int64_t>(initEnd - initStart), 0);
 
         std::cout << "********** Robot program startup complete **********" << std::endl;
         HAL_ObserveUserProgramStarting();

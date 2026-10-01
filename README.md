@@ -1,6 +1,6 @@
 # AdvantageKit C++
 
-An unofficial native C++ port of [AdvantageKit](https://github.com/Mechanical-Advantage/AdvantageKit) for WPILib 2026. The API and behavior target AdvantageKit `v26.0.1`, with C++-specific adaptations for templates, serialization and native robot lifecycle integration.
+An unofficial native C++ port of [AdvantageKit](https://github.com/Mechanical-Advantage/AdvantageKit) for WPILib 2026. The API and behavior target AdvantageKit `v26.0.2`, with C++-specific adaptations for templates, serialization and native robot lifecycle integration.
 
 This is a personal project. It is not affiliated with or endorsed by Littleton Robotics, Mechanical Advantage, AdvantageKit or my team (254).
 
