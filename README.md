@@ -18,6 +18,19 @@ This is a personal project. It is not affiliated with or endorsed by Littleton R
 
 ## Usage
 
+### Install the vendordep
+
+Choose the vendordep that matches your robot project's WPILib version:
+
+| WPILib version | Vendordep URL | Source branch |
+| --- | --- | --- |
+| 2026 | [AdvantageKitCpp.json](https://thanewye.github.io/advantagekit-cpp/AdvantageKitCpp.json) | `main` |
+| 2027.0.0-alpha-7 | [AdvantageKitCpp-2027.json](https://thanewye.github.io/advantagekit-cpp/AdvantageKitCpp-2027.json) | `2027` |
+
+The original `AdvantageKitCpp.json` URL continues to serve 2026 releases. `AdvantageKitCpp-2027.json` tracks 2027 releases and currently provides `27.0.0-alpha-6`. Install only one of these files per robot project; they identify the same library and target different WPILib versions.
+
+In VS Code, run **WPILib: Manage Vendor Libraries → Install new libraries (online)** and paste the matching URL. To pin a release, use `https://thanewye.github.io/advantagekit-cpp/AdvantageKitCpp-<version>.json`; for example, [AdvantageKitCpp-27.0.0-alpha-6.json](https://thanewye.github.io/advantagekit-cpp/AdvantageKitCpp-27.0.0-alpha-6.json) pins the current 2027 release.
+
 ### Build and publish
 
 Clone the repository with its header-only dependencies and run the release build:
@@ -42,15 +55,7 @@ The Maven repository is written to `build/repos/releases`, and the generated ven
 
 ### Use in robot code
 
-In VS Code, run **WPILib: Manage Vendor Libraries → Install new libraries (online)** and paste:
-
-```
-https://thanewye.github.io/advantagekit-cpp/AdvantageKitCpp.json
-```
-
-To pin a release, use `https://thanewye.github.io/advantagekit-cpp/AdvantageKitCpp-<version>.json` instead.
-
-Then inherit the robot class from `akit::LoggedRobot`, configure at least one receiver, and start the logger before constructing logged subsystems:
+Inherit the robot class from `akit::LoggedRobot`, configure at least one receiver, and start the logger before constructing logged subsystems:
 
 ```cpp
 #include "akit/LoggedRobot.h"
