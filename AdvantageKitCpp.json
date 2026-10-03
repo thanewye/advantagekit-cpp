@@ -2,7 +2,7 @@
     "fileName": "AdvantageKitCpp.json",
     "name": "AdvantageKit C++",
     "version": "${version}",
-    "frcYear": "2026",
+    "wpilibYear": "2027_alpha7",
     "uuid": "5fd90d86-32bd-4f56-b5f7-fc04f0a846ed",
     "mavenUrls": [
         "${mavenUrl}"
@@ -20,11 +20,11 @@
             "sharedLibrary": false,
             "skipInvalidPlatforms": true,
             "binaryPlatforms": [
-                "windowsx86-64",
+                "linuxsystemcore",
                 "linuxarm64",
+                "windowsx86-64",
+                "windowsarm64",
                 "linuxx86-64",
-                "linuxathena",
-                "linuxarm32",
                 "osxuniversal"
             ]
         }

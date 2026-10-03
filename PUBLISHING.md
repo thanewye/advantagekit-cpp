@@ -25,9 +25,9 @@ The Maven repository is written to `build/repos/releases`, the expanded vendorde
 
 1. Build every advertised platform through CI.
 2. Confirm the header ZIP contains the AdvantageKit, WPILib, Boost.PFR and magic_enum license notices.
-3. Install the candidate vendordep into a clean 2026 C++ robot project and compile desktop and roboRIO targets.
+3. Install the candidate vendordep into a clean 2027 C++ robot project and compile desktop and Systemcore targets.
 4. Run a representative WPILOG replay and compare the expected input/output keys before replacing an existing integration.
 
 ## Publish
 
-Run the `Publish` workflow with a new semantic version. It preserves existing Maven versions, updates the stable `AdvantageKitCpp.json`, writes a versioned JSON snapshot, and deploys the combined repository through GitHub Pages.
+Run the `Publish` workflow with a new semantic version. It preserves existing Maven versions, updates `AdvantageKitCpp-2027.json`, writes a versioned JSON snapshot, and deploys the combined repository through GitHub Pages.
