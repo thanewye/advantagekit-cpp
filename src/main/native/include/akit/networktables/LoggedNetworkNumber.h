@@ -3,7 +3,7 @@
 #include <string>
 #include <string_view>
 
-#include <networktables/DoubleTopic.h>
+#include <wpi/nt/DoubleTopic.hpp>
 
 #include "akit/networktables/LoggedNetworkInput.h"
 
@@ -23,7 +23,7 @@ namespace akit::networktables {
 
     private:
         std::string key_;
-        nt::DoubleEntry entry_;
+        wpi::nt::DoubleEntry entry_;
         double defaultValue_ = 0.0;
         double value_ = 0.0;
     };

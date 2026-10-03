@@ -2,14 +2,14 @@
 
 #include "akit/networktables/LoggedNetworkBoolean.h"
 
-#include <networktables/NetworkTableInstance.h>
+#include <wpi/nt/NetworkTableInstance.hpp>
 
 #include "akit/Logger.h"
 
 namespace akit::networktables {
     LoggedNetworkBoolean::LoggedNetworkBoolean(const std::string_view key)
         : key_(key)
-        , entry_(nt::NetworkTableInstance::GetDefault().GetBooleanTopic(key).GetEntry(false))
+        , entry_(wpi::nt::NetworkTableInstance::GetDefault().GetBooleanTopic(key).GetEntry(false))
         , value_(defaultValue_) {
         Logger::RegisterDashboardInput(this);
     }

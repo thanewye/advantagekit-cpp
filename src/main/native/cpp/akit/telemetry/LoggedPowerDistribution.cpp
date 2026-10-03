@@ -4,27 +4,26 @@
 
 #include <algorithm>
 #include <array>
+#include <cstring>
 
 namespace akit {
-    LoggedPowerDistribution::LoggedPowerDistribution()
-        : moduleID_(frc::PowerDistribution::kDefaultModule)
-        , powerDistribution_(std::make_unique<frc::PowerDistribution>()) {}
+    std::unique_ptr<LoggedPowerDistribution> LoggedPowerDistribution::instance_;
 
-    LoggedPowerDistribution::LoggedPowerDistribution(const int moduleID, const frc::PowerDistribution::ModuleType moduleType)
-        : moduleID_(moduleID)
+    LoggedPowerDistribution::LoggedPowerDistribution(const wpi::CANPort busId, const int moduleID, const wpi::PowerDistribution::ModuleType moduleType)
+        : busId_(busId)
+        , moduleID_(moduleID)
         , moduleType_(moduleType)
-        , powerDistribution_(std::make_unique<frc::PowerDistribution>(moduleID, moduleType)) {}
+        , powerDistribution_(std::make_unique<wpi::PowerDistribution>(busId, moduleID, moduleType)) {}
 
     LoggedPowerDistribution* LoggedPowerDistribution::GetInstance() {
-        if (!instance_) {
-            instance_ = std::unique_ptr<LoggedPowerDistribution>(new LoggedPowerDistribution());
-        }
         return instance_.get();
     }
 
-    LoggedPowerDistribution* LoggedPowerDistribution::GetInstance(const int moduleID, const frc::PowerDistribution::ModuleType moduleType) {
-        if (!instance_ || instance_->moduleID_ != moduleID || instance_->moduleType_ != moduleType) {
-            instance_ = std::unique_ptr<LoggedPowerDistribution>(new LoggedPowerDistribution(moduleID, moduleType));
+    LoggedPowerDistribution* LoggedPowerDistribution::GetInstance(const wpi::CANPort busId, const int moduleID,
+                                                                  const wpi::PowerDistribution::ModuleType moduleType) {
+        if (!instance_ || instance_->busId_ != busId || instance_->moduleID_ != moduleID || instance_->moduleType_ != moduleType) {
+            instance_.reset();
+            instance_ = std::unique_ptr<LoggedPowerDistribution>(new LoggedPowerDistribution(busId, moduleID, moduleType));
         }
         return instance_.get();
     }

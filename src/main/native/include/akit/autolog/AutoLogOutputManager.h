@@ -9,8 +9,8 @@
 #include <type_traits>
 #include <utility>
 
-#include <frc/Errors.h>
-#include <wpi/struct/Struct.h>
+#include <wpi/system/Errors.hpp>
+#include <wpi/util/struct/Struct.hpp>
 
 #include "akit/Logger.h"
 
@@ -80,7 +80,7 @@ namespace akit {
 
     namespace detail {
         [[noreturn]] inline void FailAutoLogRegistration(std::string_view message, std::string_view key) {
-            FRC_ReportError(frc::err::Error, "[AdvantageKit] {}: {}", message, key);
+            WPILIB_ReportError(wpi::err::Error, "[AdvantageKit] {}: {}", message, key);
             std::fprintf(stderr, "[AdvantageKit] %.*s: %.*s\n", static_cast<int>(message.size()), message.data(), static_cast<int>(key.size()), key.data());
             std::fflush(stderr);
             std::abort();
@@ -96,9 +96,9 @@ namespace akit {
             (std::same_as<std::remove_cvref_t<T>, float> || std::same_as<std::remove_cvref_t<T>, double>) && NamedUnit<Unit>;
 
         template<NamedUnit Unit> std::string_view ExplicitUnitName(const Unit& unit) {
-            if constexpr (units::traits::is_unit_t<Unit>::value) {
-                using UnitType = typename units::traits::unit_t_traits<Unit>::unit_type;
-                constexpr std::string_view javaName = JavaUnitNameForDimension<typename units::traits::unit_traits<UnitType>::base_unit_type>();
+            if constexpr (wpi::units::traits::is_unit_t<Unit>::value) {
+                using UnitType = typename wpi::units::traits::unit_t_traits<Unit>::unit_type;
+                constexpr std::string_view javaName = JavaUnitNameForDimension<typename wpi::units::traits::unit_traits<UnitType>::base_unit_type>();
                 if constexpr (kIsBaseScaleUnit<UnitType> && !javaName.empty()) {
                     return javaName;
                 } else {
@@ -109,7 +109,7 @@ namespace akit {
             }
         }
 
-        template<typename T> inline constexpr bool kSupportsForceSerializable = wpi::StructSerializable<std::remove_cvref_t<T>>;
+        template<typename T> inline constexpr bool kSupportsForceSerializable = wpi::util::StructSerializable<std::remove_cvref_t<T>>;
 
         constexpr std::string_view ExtractEnclosingClassName(const std::string_view prettyFunction, const std::string_view methodMarker) {
             const size_t classEnd = prettyFunction.find(methodMarker);
@@ -174,7 +174,7 @@ namespace akit {
             using SerialType = std::remove_cvref_t<SerialMode>;
 
             if constexpr (std::same_as<SerialType, ForceSerializableTag>) {
-                static_assert(kSupportsForceSerializable<ValueType>, "akit::ForceSerializable requires a wpi::StructSerializable type.");
+                static_assert(kSupportsForceSerializable<ValueType>, "akit::ForceSerializable requires a wpi::util::StructSerializable type.");
                 static_assert(std::same_as<UnitType, NoUnitTag>, "Explicit unit metadata is not supported with akit::ForceSerializable.");
                 Logger::RecordOutputStruct(key, value);
             } else if constexpr (std::same_as<UnitType, NoUnitTag>) {

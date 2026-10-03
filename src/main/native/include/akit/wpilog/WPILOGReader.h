@@ -6,7 +6,7 @@
 #include <string>
 #include <unordered_map>
 
-#include <wpi/DataLogReader.h>
+#include <wpi/datalog/DataLogReader.hpp>
 
 #include "akit/log/LogReplaySource.h"
 #include "akit/log/LoggableType.h"

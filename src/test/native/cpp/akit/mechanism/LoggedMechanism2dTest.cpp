@@ -1,10 +1,13 @@
 #include <string>
 #include <vector>
 
-#include <frc/geometry/Pose3d.h>
 #include <gtest/gtest.h>
-#include <units/angle.h>
-#include <units/length.h>
+#include <wpi/math/geometry/Pose3d.hpp>
+#include <wpi/telemetry/MockTelemetryBackend.hpp>
+#include <wpi/telemetry/Telemetry.hpp>
+#include <wpi/telemetry/TelemetryRegistry.hpp>
+#include <wpi/units/angle.hpp>
+#include <wpi/units/length.hpp>
 
 #include "akit/LoggedRobot.h"
 #include "akit/Logger.h"
@@ -20,7 +23,7 @@ namespace {
     using akit::LogValue;
     using akit::mechanism::LoggedMechanism2d;
     using akit::mechanism::LoggedMechanismLigament2d;
-    using namespace units::literals;
+    using namespace wpi::units::literals;
 
     class ValidationLoggedRobot : public akit::LoggedRobot {
     public:
@@ -33,9 +36,9 @@ namespace {
     }
 
     TEST(LoggedMechanism2dTest, LogOutputWritesTreeInAdvantageScopeFormat) {
-        LoggedMechanism2d mechanism(3.0, 4.0, frc::Color8Bit{0, 0, 32});
+        LoggedMechanism2d mechanism(3.0, 4.0, wpi::util::Color8Bit{0, 0, 32});
         auto* root = mechanism.GetRoot("Root", 1.0, 0.5);
-        auto* arm = root->Append<LoggedMechanismLigament2d>("Arm", 2.0, 90_deg, 6.0, frc::Color8Bit{255, 0, 0});
+        auto* arm = root->Append<LoggedMechanismLigament2d>("Arm", 2.0, 90_deg, 6.0, wpi::util::Color8Bit{255, 0, 0});
         arm->Append<LoggedMechanismLigament2d>("Wrist", 0.5, 45_deg);
 
         LogStorage storage;
@@ -43,11 +46,10 @@ namespace {
 
         const auto& values = storage.values;
         EXPECT_EQ(values.at("/Mech/.type"), LogValue(std::string("Mechanism2d")));
-        EXPECT_EQ(values.at("/Mech/.controllable"), LogValue(false));
+        EXPECT_FALSE(values.contains("/Mech/.controllable"));
         EXPECT_EQ(values.at("/Mech/dims"), LogValue(std::vector<double>{3.0, 4.0}));
         EXPECT_EQ(values.at("/Mech/backgroundColor"), LogValue(std::string("#000020")));
-        EXPECT_EQ(values.at("/Mech/Root/x"), LogValue(1.0));
-        EXPECT_EQ(values.at("/Mech/Root/y"), LogValue(0.5));
+        EXPECT_EQ(values.at("/Mech/Root/position"), LogValue(std::vector<double>{1.0, 0.5}));
         EXPECT_EQ(values.at("/Mech/Root/Arm/.type"), LogValue(std::string("line")));
         EXPECT_EQ(values.at("/Mech/Root/Arm/angle"), LogValue(90.0));
         EXPECT_EQ(values.at("/Mech/Root/Arm/length"), LogValue(2.0));
@@ -55,6 +57,33 @@ namespace {
         EXPECT_EQ(values.at("/Mech/Root/Arm/weight"), LogValue(6.0));
         EXPECT_EQ(values.at("/Mech/Root/Arm/Wrist/angle"), LogValue(45.0));
         EXPECT_EQ(values.at("/Mech/Root/Arm/Wrist/length"), LogValue(0.5));
+    }
+
+    TEST(LoggedMechanism2dTest, TelemetryLogMatchesWpilibMechanism2dLayout) {
+        using wpi::telemetry::MockTelemetryBackend;
+        auto backend = std::make_shared<MockTelemetryBackend>();
+        wpi::telemetry::TelemetryRegistry::RegisterBackend("/", backend);
+
+        LoggedMechanism2d mechanism(3.0, 4.0, wpi::util::Color8Bit{0, 0, 32});
+        auto* root = mechanism.GetRoot("Root", 1.0, 0.5);
+        root->Append<LoggedMechanismLigament2d>("Arm", 2.0, 90_deg, 6.0, wpi::util::Color8Bit{255, 0, 0});
+        wpi::telemetry::Log("Mech", mechanism);
+
+        const auto type = backend->GetLastValue<MockTelemetryBackend::LogStringValue>("/Mech/.type");
+        ASSERT_TRUE(type.has_value());
+        EXPECT_EQ(type->value, "Mechanism2d");
+        EXPECT_EQ(backend->GetLastValue<std::vector<double>>("/Mech/dims"), (std::vector<double>{3.0, 4.0}));
+        EXPECT_EQ(backend->GetLastValue<std::vector<double>>("/Mech/Root/position"), (std::vector<double>{1.0, 0.5}));
+        const auto armType = backend->GetLastValue<MockTelemetryBackend::LogStringValue>("/Mech/Root/Arm/.type");
+        ASSERT_TRUE(armType.has_value());
+        EXPECT_EQ(armType->value, "line");
+        EXPECT_EQ(backend->GetLastValue<double>("/Mech/Root/Arm/angle"), 90.0);
+        EXPECT_EQ(backend->GetLastValue<double>("/Mech/Root/Arm/length"), 2.0);
+        const auto armColor = backend->GetLastValue<MockTelemetryBackend::LogStringValue>("/Mech/Root/Arm/color");
+        ASSERT_TRUE(armColor.has_value());
+        EXPECT_EQ(armColor->value, "#FF0000");
+
+        wpi::telemetry::TelemetryRegistry::Reset();
     }
 
     TEST(LoggedMechanism2dTest, SettersAreReflectedInNextLogOutput) {
@@ -69,8 +98,7 @@ namespace {
         LogStorage storage;
         mechanism.LogOutput(LogTable(storage));
 
-        EXPECT_EQ(storage.values.at("/Root/x"), LogValue(0.25));
-        EXPECT_EQ(storage.values.at("/Root/y"), LogValue(0.75));
+        EXPECT_EQ(storage.values.at("/Root/position"), LogValue(std::vector<double>{0.25, 0.75}));
         EXPECT_EQ(storage.values.at("/Root/Arm/angle"), LogValue(30.0));
         EXPECT_EQ(storage.values.at("/Root/Arm/length"), LogValue(1.5));
     }
@@ -95,18 +123,18 @@ namespace {
         auto* arm = root->Append<LoggedMechanismLigament2d>("Arm", 2.0, 90_deg);
         arm->Append<LoggedMechanismLigament2d>("Wrist", 0.5, 0_deg);
 
-        const std::vector<frc::Pose3d> poses = mechanism.Generate3dMechanism();
+        const std::vector<wpi::math::Pose3d> poses = mechanism.Generate3dMechanism();
         ASSERT_EQ(poses.size(), 2u);
 
         EXPECT_NEAR(poses[0].X().value(), 1.0, 1e-9);
         EXPECT_NEAR(poses[0].Y().value(), 0.0, 1e-9);
         EXPECT_NEAR(poses[0].Z().value(), 0.5, 1e-9);
-        EXPECT_NEAR(units::degree_t{poses[0].Rotation().Y()}.value(), -90.0, 1e-6);
+        EXPECT_NEAR(wpi::units::degree_t{poses[0].Rotation().Y()}.value(), -90.0, 1e-6);
 
         EXPECT_NEAR(poses[1].X().value(), 1.0, 1e-9);
         EXPECT_NEAR(poses[1].Y().value(), 0.0, 1e-9);
         EXPECT_NEAR(poses[1].Z().value(), 2.5, 1e-9);
-        EXPECT_NEAR(units::degree_t{poses[1].Rotation().Y()}.value(), -90.0, 1e-6);
+        EXPECT_NEAR(wpi::units::degree_t{poses[1].Rotation().Y()}.value(), -90.0, 1e-6);
     }
 
     TEST(LoggedMechanism2dTest, RecordOutputWritesUnderRealOutputs) {

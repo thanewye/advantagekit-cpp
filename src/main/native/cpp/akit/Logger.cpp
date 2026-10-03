@@ -10,12 +10,11 @@
 #include <span>
 #include <utility>
 
-#include <frc/Errors.h>
-#include <frc/RobotBase.h>
-#include <frc/RobotController.h>
-#include <frc/Timer.h>
-#include <hal/FRCUsageReporting.h>
-#include <wpimath/MathShared.h>
+#include <wpi/framework/RobotBase.hpp>
+#include <wpi/math/util/MathShared.hpp>
+#include <wpi/system/Errors.hpp>
+#include <wpi/system/RobotController.hpp>
+#include <wpi/system/Timer.hpp>
 
 #include "akit/AlertLogger.h"
 #include "akit/ConsoleSource.h"
@@ -31,68 +30,11 @@
 namespace {
     class TimerBasedMathShared : public wpi::math::MathShared {
     public:
-        void ReportErrorV(fmt::string_view format, fmt::format_args args) override { frc::ReportErrorV(frc::err::Error, "", 0, "", format, args); }
+        void ReportErrorV(std::string_view format, std::format_args args) override { wpi::ReportErrorV(wpi::err::Error, "", 0, "", format, args); }
 
-        void ReportWarningV(fmt::string_view format, fmt::format_args args) override { frc::ReportErrorV(frc::warn::Warning, "", 0, "", format, args); }
+        void ReportWarningV(std::string_view format, std::format_args args) override { wpi::ReportErrorV(wpi::warn::Warning, "", 0, "", format, args); }
 
-        void ReportUsage(wpi::math::MathUsageId id, int count) override {
-            using wpi::math::MathUsageId;
-            switch (id) {
-            case MathUsageId::kKinematics_DifferentialDrive:
-                HAL_Report(HALUsageReporting::kResourceType_Kinematics, HALUsageReporting::kKinematics_DifferentialDrive);
-                break;
-            case MathUsageId::kKinematics_MecanumDrive:
-                HAL_Report(HALUsageReporting::kResourceType_Kinematics, HALUsageReporting::kKinematics_MecanumDrive);
-                break;
-            case MathUsageId::kKinematics_SwerveDrive:
-                HAL_Report(HALUsageReporting::kResourceType_Kinematics, HALUsageReporting::kKinematics_SwerveDrive);
-                break;
-            case MathUsageId::kTrajectory_TrapezoidProfile:
-                HAL_Report(HALUsageReporting::kResourceType_TrapezoidProfile, count);
-                break;
-            case MathUsageId::kFilter_Linear:
-                HAL_Report(HALUsageReporting::kResourceType_LinearFilter, count);
-                break;
-            case MathUsageId::kOdometry_DifferentialDrive:
-                HAL_Report(HALUsageReporting::kResourceType_Odometry, HALUsageReporting::kOdometry_DifferentialDrive);
-                break;
-            case MathUsageId::kOdometry_SwerveDrive:
-                HAL_Report(HALUsageReporting::kResourceType_Odometry, HALUsageReporting::kOdometry_SwerveDrive);
-                break;
-            case MathUsageId::kOdometry_MecanumDrive:
-                HAL_Report(HALUsageReporting::kResourceType_Odometry, HALUsageReporting::kOdometry_MecanumDrive);
-                break;
-            case MathUsageId::kController_PIDController2:
-                HAL_Report(HALUsageReporting::kResourceType_PIDController2, count);
-                break;
-            case MathUsageId::kController_ProfiledPIDController:
-                HAL_Report(HALUsageReporting::kResourceType_ProfiledPIDController, count);
-                break;
-            case MathUsageId::kController_BangBangController:
-                HAL_Report(HALUsageReporting::kResourceType_BangBangController, count);
-                break;
-            case MathUsageId::kTrajectory_PathWeaver:
-                HAL_Report(HALUsageReporting::kResourceType_PathWeaverTrajectory, count);
-                break;
-            case MathUsageId::kController_LinearQuadraticRegulator:
-                HAL_Report(HALUsageReporting::kResourceType_LinearQuadraticRegulator, count);
-                break;
-            case MathUsageId::kEstimator_KalmanFilter:
-                HAL_Report(HALUsageReporting::kResourceType_KalmanFilter, count);
-                break;
-            case MathUsageId::kEstimator_PoseEstimator:
-                HAL_Report(HALUsageReporting::kResourceType_PoseEstimator, count);
-                break;
-            case MathUsageId::kEstimator_PoseEstimator3d:
-                HAL_Report(HALUsageReporting::kResourceType_PoseEstimator3d, count);
-                break;
-            case MathUsageId::kSystem_LinearSystemLoop:
-                HAL_Report(HALUsageReporting::kResourceType_LinearSystemLoop, count);
-                break;
-            }
-        }
-
-        units::second_t GetTimestamp() override { return frc::Timer::GetTimestamp(); }
+        wpi::units::second_t GetTimestamp() override { return wpi::Timer::GetTimestamp(); }
     };
 } // namespace
 
@@ -101,32 +43,33 @@ namespace akit {
         if (running_) return;
 
         if (checkRobotBase_ && !LoggedRobot::IsBaseConstructed()) {
-            FRC_ReportError(frc::err::Error, "The main robot class must inherit from LoggedRobot when using AdvantageKit. For more details, check the "
-                                             "AdvantageKit installation documentation: https://docs.advantagekit.org/getting-started/installation\n\n*** "
-                                             "EXITING DUE TO INVALID ADVANTAGEKIT INSTALLATION, SEE ABOVE. ***");
+            WPILIB_ReportError(wpi::err::Error, "The main robot class must inherit from LoggedRobot when using AdvantageKit. For more details, check the "
+                                                "AdvantageKit installation documentation: https://docs.advantagekit.org/getting-started/installation\n\n*** "
+                                                "EXITING DUE TO INVALID ADVANTAGEKIT INSTALLATION, SEE ABOVE. ***");
             std::exit(1);
         }
 
         if (HasReplaySource()) {
             const char* halSimExtensions = std::getenv("HALSIM_EXTENSIONS");
             if (halSimExtensions != nullptr && halSimExtensions[0] != '\0') {
-                FRC_ReportError(frc::err::Error,
-                                "[AdvantageKit] All HAL simulation extensions must be disabled when running AdvantageKit replay, including the simulation GUI "
-                                "and DriverStation connection. Check the configuration in \"build.gradle\" and ensure that all checkboxes are disabled in the "
-                                "VSCode simulation popup.\n\n*** EXITING DUE TO INVALID SIMULATION CONFIGURATION, SEE ABOVE. ***");
+                WPILIB_ReportError(
+                    wpi::err::Error,
+                    "[AdvantageKit] All HAL simulation extensions must be disabled when running AdvantageKit replay, including the simulation GUI "
+                    "and DriverStation connection. Check the configuration in \"build.gradle\" and ensure that all checkboxes are disabled in the "
+                    "VSCode simulation popup.\n\n*** EXITING DUE TO INVALID SIMULATION CONFIGURATION, SEE ABOVE. ***");
                 std::exit(1);
             }
         }
 
         if (console_ == nullptr) {
-            if (frc::RobotBase::IsReal()) console_ = std::make_unique<ConsoleSource::RoboRIO>();
+            if (wpi::RobotBase::IsReal()) console_ = std::make_unique<ConsoleSource::Systemcore>();
             else console_ = std::make_unique<ConsoleSource::Simulator>();
         }
 
         running_ = true;
-        frc::RobotController::SetTimeSource([]() -> uint64_t { return static_cast<uint64_t>(std::llround(GetTimestamp().value() * 1'000'000.0)); });
+        wpi::RobotController::SetTimeSource([]() -> int64_t { return static_cast<int64_t>(std::llround(GetTimestamp().value() * 1'000'000'000.0)); });
         wpi::math::MathSharedStore::SetMathShared(std::make_unique<TimerBasedMathShared>());
-        lastTimestamp_ = static_cast<int64_t>(frc::Timer::GetFPGATimestamp().value() * 1'000'000.0);
+        lastTimestamp_ = wpi::RobotController::GetMonotonicTime();
         currentStorage_.Clear();
         currentStorage_.timestamp = 0;
         LogTable meta = LogTable(currentStorage_).GetSubtable(HasReplaySource() ? "ReplayMetadata" : "RealMetadata");
@@ -144,7 +87,8 @@ namespace akit {
     void Logger::End() {
         if (!running_) return;
         running_ = false;
-        frc::RobotController::SetTimeSource([]() -> uint64_t { return frc::RobotController::GetFPGATime(); });
+        wpi::RobotController::SetTimeSource(wpi::RobotController::GetMonotonicTime);
+        static_cast<void>(wpi::RobotController::GetTime());
         console_.reset();
         if (HasReplaySource()) {
             replaySource_->End();
@@ -157,11 +101,11 @@ namespace akit {
     void Logger::PeriodicBeforeUser() {
         cycles_++;
         if (!running_) return;
-        const uint64_t entryUpdateStart = frc::RobotController::GetFPGATime();
+        const int64_t entryUpdateStart = wpi::RobotController::GetMonotonicTime();
         LogTable root(currentStorage_);
 
         if (!HasReplaySource()) {
-            currentStorage_.timestamp = static_cast<int64_t>(frc::Timer::GetFPGATimestamp().value() * 1'000'000.0);
+            currentStorage_.timestamp = wpi::RobotController::GetMonotonicTime();
         } else {
             if (!replaySource_->UpdateTable(root)) {
                 End();
@@ -169,53 +113,55 @@ namespace akit {
             }
         }
 
-        const uint64_t driverStationStart = frc::RobotController::GetFPGATime();
+        const int64_t driverStationStart = wpi::RobotController::GetMonotonicTime();
         if (HasReplaySource()) {
             LoggedDriverStation::ReplayFromLog(root.GetSubtable("DriverStation"));
         }
-        const uint64_t dashboardInputsStart = frc::RobotController::GetFPGATime();
+        const int64_t dashboardInputsStart = wpi::RobotController::GetMonotonicTime();
         for (auto* input : dashboardInputs_) {
             if (input != nullptr) input->Periodic();
         }
-        const uint64_t dashboardInputsEnd = frc::RobotController::GetFPGATime();
+        const int64_t dashboardInputsEnd = wpi::RobotController::GetMonotonicTime();
 
-        RecordOutput("Logger/EntryUpdateMS", (driverStationStart - entryUpdateStart) / 1000.0);
+        RecordOutput("Logger/EntryUpdateMS", (driverStationStart - entryUpdateStart) / 1'000'000.0);
         if (HasReplaySource()) {
-            RecordOutput("Logger/DriverStationMS", (dashboardInputsStart - driverStationStart) / 1000.0);
+            RecordOutput("Logger/DriverStationMS", (dashboardInputsStart - driverStationStart) / 1'000'000.0);
         }
-        RecordOutput("Logger/DashboardInputsMS", (dashboardInputsEnd - dashboardInputsStart) / 1000.0);
+        RecordOutput("Logger/DashboardInputsMS", (dashboardInputsEnd - dashboardInputsStart) / 1'000'000.0);
     }
 
     void Logger::PeriodicAfterUser() {
         PeriodicAfterUser(0, 0);
     }
 
-    void Logger::PeriodicAfterUser(const int64_t userCodeUs, const int64_t periodicBeforeUs) {
-        PeriodicAfterUser(userCodeUs, periodicBeforeUs, "");
+    void Logger::PeriodicAfterUser(const int64_t userCodeNs, const int64_t periodicBeforeNs) {
+        PeriodicAfterUser(userCodeNs, periodicBeforeNs, "");
     }
 
-    void Logger::PeriodicAfterUser(const int64_t userCodeUs, const int64_t periodicBeforeUs, const std::string_view extraConsoleData) {
+    void Logger::PeriodicAfterUser(const int64_t userCodeNs, const int64_t periodicBeforeNs, const std::string_view extraConsoleData) {
         if (!running_) return;
-        uint64_t afterStart = frc::RobotController::GetFPGATime();
+        const int64_t afterStart = wpi::RobotController::GetMonotonicTime();
 
         LogTable root(currentStorage_);
         if (!HasReplaySource()) {
-            const uint64_t dsStart = frc::RobotController::GetFPGATime();
+            const int64_t dsStart = wpi::RobotController::GetMonotonicTime();
             LogTable dsTable = root.GetSubtable("DriverStation");
             LoggedDriverStation::SaveToLog(dsTable);
-            LoggedPowerDistribution::GetInstance()->SaveToLog(root.GetSubtable("PowerDistribution"));
             LoggedSystemStats::SaveToLog(root.GetSubtable("SystemStats"));
-            RecordOutput("Logger/DriverStationMS", (frc::RobotController::GetFPGATime() - dsStart) / 1000.0);
+            if (const auto* loggedPowerDistribution = LoggedPowerDistribution::GetInstance()) {
+                loggedPowerDistribution->SaveToLog(root.GetSubtable("PowerDistribution"));
+            }
+            RecordOutput("Logger/DriverStationMS", (wpi::RobotController::GetMonotonicTime() - dsStart) / 1'000'000.0);
         }
-        const uint64_t autoLogStart = frc::RobotController::GetFPGATime();
+        const int64_t autoLogStart = wpi::RobotController::GetMonotonicTime();
         AutoLogOutputManager::Periodic();
-        const uint64_t alertStart = frc::RobotController::GetFPGATime();
+        const int64_t alertStart = wpi::RobotController::GetMonotonicTime();
         AlertLogger::Periodic();
-        const uint64_t radioStart = frc::RobotController::GetFPGATime();
+        const int64_t radioStart = wpi::RobotController::GetMonotonicTime();
         if (!HasReplaySource()) {
-            RadioLogger::Periodic(root.GetSubtable("RadioStatus"));
+            RadioLogger::Periodic(root.GetSubtable("RadioStatus"), root.Get("SystemStats/TeamNumber", static_cast<int64_t>(-1)));
         }
-        const uint64_t consoleStart = frc::RobotController::GetFPGATime();
+        const int64_t consoleStart = wpi::RobotController::GetMonotonicTime();
         std::string consoleData = console_ != nullptr ? console_->GetNewData() : "";
         consoleData.append(extraConsoleData);
         if (!consoleData.empty()) {
@@ -227,24 +173,24 @@ namespace akit {
             }
             if (!consoleData.empty()) RecordOutput("Console", consoleData);
         }
-        const uint64_t consoleEnd = frc::RobotController::GetFPGATime();
+        const int64_t consoleEnd = wpi::RobotController::GetMonotonicTime();
 
-        RecordOutput("Logger/AutoLogMS", (alertStart - autoLogStart) / 1000.0);
-        RecordOutput("Logger/AlertLogMS", (radioStart - alertStart) / 1000.0);
-        RecordOutput("Logger/RadioLogMS", (consoleStart - radioStart) / 1000.0);
-        RecordOutput("Logger/ConsoleMS", (consoleEnd - consoleStart) / 1000.0);
+        RecordOutput("Logger/AutoLogMS", (alertStart - autoLogStart) / 1'000'000.0);
+        RecordOutput("Logger/AlertLogMS", (radioStart - alertStart) / 1'000'000.0);
+        RecordOutput("Logger/RadioLogMS", (consoleStart - radioStart) / 1'000'000.0);
+        RecordOutput("Logger/ConsoleMS", (consoleEnd - consoleStart) / 1'000'000.0);
 
         LogTable loggerTable = root.GetSubtable("Logger");
-        loggerTable.Put("Timestamp", currentStorage_.timestamp / 1'000'000.0);
-        loggerTable.Put("TimeSinceLastCycle", (currentStorage_.timestamp - lastTimestamp_) / 1'000'000.0);
+        loggerTable.Put("Timestamp", currentStorage_.timestamp / 1'000'000'000.0);
+        loggerTable.Put("TimeSinceLastCycle", (currentStorage_.timestamp - lastTimestamp_) / 1'000'000'000.0);
         loggerTable.Put("CycleCount", static_cast<int64_t>(cycles_));
         lastTimestamp_ = currentStorage_.timestamp;
 
-        int64_t periodicAfterUs = static_cast<int64_t>(consoleEnd - afterStart);
+        const int64_t periodicAfterNs = consoleEnd - afterStart;
 
-        RecordOutput("LoggedRobot/UserCodeMS", userCodeUs / 1000.0);
-        RecordOutput("LoggedRobot/LogPeriodicMS", (periodicBeforeUs + periodicAfterUs) / 1000.0);
-        RecordOutput("LoggedRobot/FullCycleMS", (periodicBeforeUs + userCodeUs + periodicAfterUs) / 1000.0);
+        RecordOutput("LoggedRobot/UserCodeMS", userCodeNs / 1'000'000.0);
+        RecordOutput("LoggedRobot/LogPeriodicMS", (periodicBeforeNs + periodicAfterNs) / 1'000'000.0);
+        RecordOutput("LoggedRobot/FullCycleMS", (periodicBeforeNs + userCodeNs + periodicAfterNs) / 1'000'000.0);
         RecordOutput("Logger/QueuedCycles", static_cast<int64_t>(receiverThread_.QueueSize()));
         if (HasReplaySource()) {
             receiverThread_.DispatchNow(root);
@@ -253,7 +199,7 @@ namespace akit {
         LogStorage snapshot;
         LogTable::Clone(root, snapshot);
         if (!receiverThread_.Enqueue(std::move(snapshot))) {
-            FRC_ReportError(frc::err::Error, "[AdvantageKit] Capacity of receiver queue exceeded, data will NOT be logged.");
+            WPILIB_ReportError(wpi::err::Error, "[AdvantageKit] Capacity of receiver queue exceeded, data will NOT be logged.");
         }
     }
 
@@ -333,10 +279,10 @@ namespace akit {
         metadata_[std::string(key)] = std::string(value);
     }
 
-    units::second_t Logger::GetTimestamp() {
+    wpi::units::second_t Logger::GetTimestamp() {
         std::scoped_lock lock(mutex_);
-        auto time = !running_ || currentStorage_.Empty() ? units::microsecond_t{static_cast<double>(frc::RobotController::GetFPGATime())}
-                                                         : units::microsecond_t{static_cast<double>(currentStorage_.timestamp)};
+        auto time = !running_ || currentStorage_.Empty() ? wpi::units::nanosecond_t{static_cast<double>(wpi::RobotController::GetMonotonicTime())}
+                                                         : wpi::units::nanosecond_t{static_cast<double>(currentStorage_.timestamp)};
         return time;
     }
 

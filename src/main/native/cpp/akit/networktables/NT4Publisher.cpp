@@ -2,8 +2,8 @@
 
 #include "akit/networktables/NT4Publisher.h"
 
-#include <networktables/NetworkTableInstance.h>
-#include <wpi/json.h>
+#include <wpi/nt/NetworkTableInstance.hpp>
+#include <wpi/util/json.hpp>
 
 namespace akit::networktables {
     namespace {
@@ -14,8 +14,10 @@ namespace akit::networktables {
     } // namespace
 
     NT4Publisher::NT4Publisher() {
-        akitTable_ = nt::NetworkTableInstance::GetDefault().GetTable("/AdvantageKit");
-        timestampPublisher_ = akitTable_->GetIntegerTopic(kTimestampKey.substr(1)).Publish(nt::PubSubOptions{.sendAll = true});
+        akitTable_ = wpi::nt::NetworkTableInstance::GetDefault().GetTable("/AdvantageKit");
+        timestampPublisher_ = akitTable_->GetIntegerTopic(kTimestampKey.substr(1))
+                                  .PublishEx(wpi::nt::IntegerTopic::TYPE_STRING, wpi::util::json::object("unit", "nanoseconds", "mutable", "false"),
+                                             wpi::nt::PubSubOptions{.sendAll = true});
     }
 
     void NT4Publisher::PutTable(const LogTable& table) {
@@ -69,17 +71,18 @@ namespace akit::networktables {
         return val.GetNT4Type();
     }
 
-    nt::GenericPublisher& NT4Publisher::GetOrCreatePublisher(const std::string& key, const LogValue& value) {
+    wpi::nt::GenericPublisher& NT4Publisher::GetOrCreatePublisher(const std::string& key, const LogValue& value) {
         const auto topicKey = NormalizeTopicKey(key);
         auto publisher = publishers_.find(topicKey);
 
         // publisher does not exist, create
         if (publisher == publishers_.end()) {
-            nt::Topic topic = akitTable_->GetTopic(topicKey);
+            wpi::nt::Topic topic = akitTable_->GetTopic(topicKey);
             auto unit = value.unitStr;
 
             // construct publisher within the emplace (black magic)
-            auto [createdPublisher, inserted] = publishers_.emplace(topicKey, topic.GenericPublish(GetNT4Type(value), nt::PubSubOptions{.sendAll = true}));
+            auto [createdPublisher, inserted] = publishers_.emplace(
+                topicKey, topic.GenericPublishEx(GetNT4Type(value), wpi::util::json::object("mutable", "false"), wpi::nt::PubSubOptions{.sendAll = true}));
 
             if (unit.has_value() && !unit->empty()) {
                 topic.SetProperty("unit", "\"" + unit.value() + "\"");

@@ -6,7 +6,7 @@
 #include <exception>
 #include <utility>
 
-#include <frc/Errors.h>
+#include <wpi/system/Errors.hpp>
 
 namespace akit {
     ReceiverThread::~ReceiverThread() {
@@ -114,9 +114,9 @@ namespace akit {
             try {
                 receiver->PutTable(table);
             } catch (const std::exception& e) {
-                FRC_ReportError(frc::err::Error, "[AdvantageKit] Data receiver threw an exception: {}", e.what());
+                WPILIB_ReportError(wpi::err::Error, "[AdvantageKit] Data receiver threw an exception: {}", e.what());
             } catch (...) {
-                FRC_ReportError(frc::err::Error, "[AdvantageKit] Data receiver threw an unknown exception.");
+                WPILIB_ReportError(wpi::err::Error, "[AdvantageKit] Data receiver threw an unknown exception.");
             }
         }
     }

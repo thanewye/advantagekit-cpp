@@ -12,13 +12,13 @@
 #include <utility>
 #include <vector>
 
-#include <frc/Errors.h>
-#include <frc/util/Color.h>
-#include <frc/util/Color8Bit.h>
 #include <magic_enum/magic_enum.hpp>
-#include <units/base.h>
-#include <units/time.h>
-#include <wpi/struct/Struct.h>
+#include <wpi/system/Errors.hpp>
+#include <wpi/units/base.hpp>
+#include <wpi/units/time.hpp>
+#include <wpi/util/Color.hpp>
+#include <wpi/util/Color8Bit.hpp>
+#include <wpi/util/struct/Struct.hpp>
 
 #include "akit/ConsoleSource.h"
 #include "akit/inputs/LoggableInputs.h"
@@ -44,8 +44,8 @@ namespace akit {
 
         static void PeriodicBeforeUser();
         static void PeriodicAfterUser();
-        static void PeriodicAfterUser(int64_t userCodeUs, int64_t periodicBeforeUs);
-        static void PeriodicAfterUser(int64_t userCodeUs, int64_t periodicBeforeUs, std::string_view extraConsoleData);
+        static void PeriodicAfterUser(int64_t userCodeNs, int64_t periodicBeforeNs);
+        static void PeriodicAfterUser(int64_t userCodeNs, int64_t periodicBeforeNs, std::string_view extraConsoleData);
 
         static void SetReplaySource(LogReplaySource* source);
         static bool HasReplaySource();
@@ -152,18 +152,18 @@ namespace akit {
             RecordOutput2D<E>(key, values);
         }
 
-        template<typename U> static void RecordOutput(const std::string& key, units::unit_t<U> value) {
+        template<typename U> static void RecordOutput(const std::string& key, wpi::units::unit_t<U> value) {
             if (!running_) return;
             LogTable(currentStorage_).GetSubtable(HasReplaySource() ? "ReplayOutputs" : "RealOutputs").Put(key, value);
         }
 
-        static void RecordOutput(const std::string& key, frc::Color value) { RecordOutput(key, std::string_view{value.HexString()}); }
+        static void RecordOutput(const std::string& key, wpi::util::Color value) { RecordOutput(key, std::string_view{value.HexString()}); }
 
-        static void RecordOutput(const std::string& key, frc::Color8Bit value) { RecordOutput(key, std::string_view{value.HexString()}); }
+        static void RecordOutput(const std::string& key, wpi::util::Color8Bit value) { RecordOutput(key, std::string_view{value.HexString()}); }
 
         static void RecordOutput(const std::string& key, const mechanism::LoggedMechanism2d& value);
 
-        template<wpi::StructSerializable T> static void RecordOutput(const std::string& key, const T& value) {
+        template<wpi::util::StructSerializable T> static void RecordOutput(const std::string& key, const T& value) {
             if (!running_) return;
             LogTable(currentStorage_).GetSubtable(HasReplaySource() ? "ReplayOutputs" : "RealOutputs").Put(key, value);
         }
@@ -173,14 +173,14 @@ namespace akit {
             LogTable(currentStorage_).GetSubtable(HasReplaySource() ? "ReplayOutputs" : "RealOutputs").Put(key, value);
         }
 
-        template<wpi::StructSerializable T> static void RecordOutputStruct(const std::string& key, const T& value) {
+        template<wpi::util::StructSerializable T> static void RecordOutputStruct(const std::string& key, const T& value) {
             if (!running_) return;
             AddStructSchema<T>();
-            std::vector<uint8_t> buffer(wpi::Struct<T>::GetSize());
-            wpi::PackStruct(std::span{buffer}, value);
+            std::vector<uint8_t> buffer(wpi::util::Struct<T>::GetSize());
+            wpi::util::PackStruct(std::span{buffer}, value);
             LogTable(currentStorage_)
                 .GetSubtable(HasReplaySource() ? "ReplayOutputs" : "RealOutputs")
-                .Put(key, LogValue{std::move(buffer), std::string(wpi::GetStructTypeString<T>())});
+                .Put(key, LogValue{std::move(buffer), std::string(wpi::util::GetStructTypeString<T>())});
         }
 
         template<detail::StructArrayElement T> static void RecordOutput(const std::string& key, const std::vector<T>& values) {
@@ -188,25 +188,25 @@ namespace akit {
             LogTable(currentStorage_).GetSubtable(HasReplaySource() ? "ReplayOutputs" : "RealOutputs").Put(key, values);
         }
 
-        template<wpi::StructSerializable T> static void RecordOutputStruct(const std::string& key, const std::vector<T>& values) {
+        template<wpi::util::StructSerializable T> static void RecordOutputStruct(const std::string& key, const std::vector<T>& values) {
             if (!running_) return;
             AddStructSchema<T>();
-            const size_t elementSize = wpi::Struct<T>::GetSize();
+            const size_t elementSize = wpi::util::Struct<T>::GetSize();
             std::vector<uint8_t> buffer(elementSize * values.size());
             for (size_t i = 0; i < values.size(); i++) {
-                wpi::PackStruct(std::span{buffer}.subspan(i * elementSize, elementSize), values[i]);
+                wpi::util::PackStruct(std::span{buffer}.subspan(i * elementSize, elementSize), values[i]);
             }
             LogTable(currentStorage_)
                 .GetSubtable(HasReplaySource() ? "ReplayOutputs" : "RealOutputs")
-                .Put(key, LogValue{std::move(buffer), std::string(wpi::GetStructTypeString<T>()) + "[]"});
+                .Put(key, LogValue{std::move(buffer), std::string(wpi::util::GetStructTypeString<T>()) + "[]"});
         }
 
-        template<wpi::StructSerializable T> static void RecordOutput(const std::string& key, std::span<const std::vector<T>> values) {
+        template<wpi::util::StructSerializable T> static void RecordOutput(const std::string& key, std::span<const std::vector<T>> values) {
             if (!running_) return;
             LogTable(currentStorage_).GetSubtable(HasReplaySource() ? "ReplayOutputs" : "RealOutputs").Put(key, values);
         }
 
-        template<wpi::StructSerializable T> static void RecordOutputStruct(const std::string& key, std::span<const std::vector<T>> values) {
+        template<wpi::util::StructSerializable T> static void RecordOutputStruct(const std::string& key, std::span<const std::vector<T>> values) {
             if (!running_) return;
             RecordOutput(key + "/length", static_cast<int64_t>(values.size()));
             for (size_t i = 0; i < values.size(); i++) {
@@ -214,33 +214,33 @@ namespace akit {
             }
         }
 
-        template<wpi::StructSerializable T> static void RecordOutput(const std::string& key, std::span<const T> values) {
+        template<wpi::util::StructSerializable T> static void RecordOutput(const std::string& key, std::span<const T> values) {
             if (!running_) return;
             LogTable(currentStorage_).GetSubtable(HasReplaySource() ? "ReplayOutputs" : "RealOutputs").Put(key, values);
         }
 
-        template<wpi::StructSerializable T> static void RecordOutputStruct(const std::string& key, std::span<const T> values) {
+        template<wpi::util::StructSerializable T> static void RecordOutputStruct(const std::string& key, std::span<const T> values) {
             if (!running_) return;
             AddStructSchema<T>();
-            const size_t elementSize = wpi::Struct<T>::GetSize();
+            const size_t elementSize = wpi::util::Struct<T>::GetSize();
             std::vector<uint8_t> buffer(elementSize * values.size());
             for (size_t i = 0; i < values.size(); i++) {
-                wpi::PackStruct(std::span{buffer}.subspan(i * elementSize, elementSize), values[i]);
+                wpi::util::PackStruct(std::span{buffer}.subspan(i * elementSize, elementSize), values[i]);
             }
             LogTable(currentStorage_)
                 .GetSubtable(HasReplaySource() ? "ReplayOutputs" : "RealOutputs")
-                .Put(key, LogValue{std::move(buffer), std::string(wpi::GetStructTypeString<T>()) + "[]"});
+                .Put(key, LogValue{std::move(buffer), std::string(wpi::util::GetStructTypeString<T>()) + "[]"});
         }
 
         template<typename func> static void RunEveryN(int period, func&& fn) {
             if (period < 1) {
-                FRC_ReportError(frc::err::Error, "[AdvantageKit] RunEveryN period must be >= 1 (got {})", period);
+                WPILIB_ReportError(wpi::err::Error, "[AdvantageKit] RunEveryN period must be >= 1 (got {})", period);
                 return;
             }
             if (cycles_ % period == 0) std::forward<func>(fn)();
         }
 
-        static units::second_t GetTimestamp();
+        static wpi::units::second_t GetTimestamp();
         static int GetCycleCount() { return cycles_; }
         static const LogStorage& GetCurrentStorage();
         static void DumpCurrentStorage();
@@ -262,8 +262,8 @@ namespace akit {
         inline static std::mutex mutex_{};
         inline static ReceiverThread receiverThread_{};
 
-        template<wpi::StructSerializable T> static void AddStructSchema() {
-            wpi::ForEachStructSchema<T>([](std::string_view typeStr, std::string_view schema) {
+        template<wpi::util::StructSerializable T> static void AddStructSchema() {
+            wpi::util::ForEachStructSchema<T>([](std::string_view typeStr, std::string_view schema) {
                 std::string schemaKey = "/.schema/";
                 schemaKey += typeStr;
                 if (currentStorage_.values.contains(schemaKey)) return;

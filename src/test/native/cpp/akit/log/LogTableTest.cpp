@@ -6,16 +6,19 @@
 #include <string>
 #include <vector>
 
-#include <frc/geometry/Rotation2d.h>
-#include <frc/trajectory/Trajectory.h>
 #include <gtest/gtest.h>
-#include <units/angle.h>
-#include <units/area.h>
-#include <units/current.h>
-#include <units/length.h>
-#include <units/mass.h>
-#include <units/velocity.h>
-#include <wpi/struct/Struct.h>
+#include <wpi/math/geometry/Rotation2d.hpp>
+#include <wpi/math/trajectory/HolonomicTrajectory.hpp>
+#include <wpi/units/acceleration.hpp>
+#include <wpi/units/angle.hpp>
+#include <wpi/units/angular_acceleration.hpp>
+#include <wpi/units/angular_velocity.hpp>
+#include <wpi/units/area.hpp>
+#include <wpi/units/current.hpp>
+#include <wpi/units/length.hpp>
+#include <wpi/units/mass.hpp>
+#include <wpi/units/velocity.hpp>
+#include <wpi/util/struct/Struct.hpp>
 
 #include "akit/LoggedRobot.h"
 #include "akit/Logger.h"
@@ -33,7 +36,7 @@ struct AggregateInputs {
 struct VectorAggregateInputs {
     std::vector<double> currents;
     std::vector<int> ids;
-    std::vector<frc::Rotation2d> angles;
+    std::vector<wpi::math::Rotation2d> angles;
 };
 
 namespace {
@@ -43,7 +46,7 @@ namespace {
     using akit::LogStorage;
     using akit::LogTable;
     using akit::LogValue;
-    using namespace units::literals;
+    using namespace wpi::units::literals;
 
     // PutTable now runs on the receiver thread while tests read from the main thread, so all
     // access to snapshots_ goes through mutex_; WaitForSnapshots lets a test block until async
@@ -97,26 +100,32 @@ namespace {
         static ValidationLoggedRobot robot;
     }
 
-    std::vector<uint8_t> PackRotation(const frc::Rotation2d& rotation) {
-        std::vector<uint8_t> bytes(wpi::Struct<frc::Rotation2d>::GetSize());
-        wpi::PackStruct(std::span{bytes}, rotation);
+    std::vector<uint8_t> PackRotation(const wpi::math::Rotation2d& rotation) {
+        std::vector<uint8_t> bytes(wpi::util::Struct<wpi::math::Rotation2d>::GetSize());
+        wpi::util::PackStruct(std::span{bytes}, rotation);
         return bytes;
     }
 
-    std::vector<uint8_t> PackRotations(const std::vector<frc::Rotation2d>& rotations) {
-        const size_t elemSize = wpi::Struct<frc::Rotation2d>::GetSize();
+    std::vector<uint8_t> PackRotations(const std::vector<wpi::math::Rotation2d>& rotations) {
+        const size_t elemSize = wpi::util::Struct<wpi::math::Rotation2d>::GetSize();
         std::vector<uint8_t> bytes(elemSize * rotations.size());
         for (size_t i = 0; i < rotations.size(); ++i) {
-            wpi::PackStruct(std::span{bytes}.subspan(i * elemSize, elemSize), rotations[i]);
+            wpi::util::PackStruct(std::span{bytes}.subspan(i * elemSize, elemSize), rotations[i]);
         }
         return bytes;
     }
 
-    frc::Trajectory MakeTrajectory() {
-        return frc::Trajectory{std::vector<frc::Trajectory::State>{
-            {0.0_s, 0.0_mps, 1.0_mps_sq, frc::Pose2d{1.0_m, 2.0_m, frc::Rotation2d{0.5_rad}}, units::curvature_t{0.0}},
-            {1.5_s, 1.5_mps, 0.0_mps_sq, frc::Pose2d{3.0_m, 4.0_m, frc::Rotation2d{1.0_rad}}, units::curvature_t{0.25}},
+    wpi::math::HolonomicTrajectory MakeTrajectory() {
+        return wpi::math::HolonomicTrajectory{std::vector<wpi::math::HolonomicSample>{
+            {0.0_s, wpi::math::Pose2d{1.0_m, 2.0_m, wpi::math::Rotation2d{0.5_rad}}, wpi::math::ChassisVelocities{0.0_mps, 0.0_mps, 0.0_rad_per_s},
+             wpi::math::ChassisAccelerations{1.0_mps_sq, 0.0_mps_sq, 0.0_rad_per_s_sq}},
+            {1.5_s, wpi::math::Pose2d{3.0_m, 4.0_m, wpi::math::Rotation2d{1.0_rad}}, wpi::math::ChassisVelocities{1.5_mps, 0.0_mps, 0.25_rad_per_s},
+             wpi::math::ChassisAccelerations{0.0_mps_sq, 0.0_mps_sq, 0.0_rad_per_s_sq}},
         }};
+    }
+
+    wpi::math::HolonomicTrajectory DefaultTrajectory() {
+        return wpi::math::HolonomicTrajectory{std::vector<wpi::math::HolonomicSample>{wpi::math::HolonomicSample{}}};
     }
 
     size_t CountProtobufSchemas(const LogStorage& storage) {
@@ -130,11 +139,11 @@ namespace {
     TEST(LogTableStructTest, StructRoundTripSucceedsWhenTypeMatches) {
         LogStorage storage;
         LogTable table(storage);
-        frc::Rotation2d expected{units::radian_t{1.234}};
+        wpi::math::Rotation2d expected{wpi::units::radian_t{1.234}};
 
         table.Put("rotation", expected);
 
-        frc::Rotation2d actual = table.Get("rotation", frc::Rotation2d{});
+        wpi::math::Rotation2d actual = table.Get("rotation", wpi::math::Rotation2d{});
 
         EXPECT_DOUBLE_EQ(actual.Radians().value(), expected.Radians().value());
     }
@@ -142,11 +151,11 @@ namespace {
     TEST(LogTableStructTest, SingleStructReplayReturnsDefaultOnWrongCustomType) {
         LogStorage storage;
         LogTable table(storage);
-        frc::Rotation2d expectedDefault{units::radian_t{0.75}};
+        wpi::math::Rotation2d expectedDefault{wpi::units::radian_t{0.75}};
 
-        table.Put("rotation", LogValue{PackRotation(frc::Rotation2d{units::radian_t{1.234}}), "wrong:type"});
+        table.Put("rotation", LogValue{PackRotation(wpi::math::Rotation2d{wpi::units::radian_t{1.234}}), "wrong:type"});
 
-        frc::Rotation2d actual = table.Get("rotation", expectedDefault);
+        wpi::math::Rotation2d actual = table.Get("rotation", expectedDefault);
 
         EXPECT_DOUBLE_EQ(actual.Radians().value(), expectedDefault.Radians().value());
     }
@@ -154,12 +163,12 @@ namespace {
     TEST(LogTableStructTest, SingleStructReplayReturnsDefaultOnWrongRawSize) {
         LogStorage storage;
         LogTable table(storage);
-        frc::Rotation2d expectedDefault{units::radian_t{0.75}};
-        std::vector<uint8_t> bytes(wpi::Struct<frc::Rotation2d>::GetSize() + 1, 0);
+        wpi::math::Rotation2d expectedDefault{wpi::units::radian_t{0.75}};
+        std::vector<uint8_t> bytes(wpi::util::Struct<wpi::math::Rotation2d>::GetSize() + 1, 0);
 
-        table.Put("rotation", LogValue{std::move(bytes), std::string(wpi::GetStructTypeString<frc::Rotation2d>())});
+        table.Put("rotation", LogValue{std::move(bytes), std::string(wpi::util::GetStructTypeString<wpi::math::Rotation2d>())});
 
-        frc::Rotation2d actual = table.Get("rotation", expectedDefault);
+        wpi::math::Rotation2d actual = table.Get("rotation", expectedDefault);
 
         EXPECT_DOUBLE_EQ(actual.Radians().value(), expectedDefault.Radians().value());
     }
@@ -167,18 +176,18 @@ namespace {
     TEST(LogTableStructTest, StructArrayReplayReturnsDefaultOnSingleStructTypeString) {
         LogStorage storage;
         LogTable table(storage);
-        std::vector<frc::Rotation2d> expectedDefault{
-            frc::Rotation2d{units::radian_t{0.25}},
-            frc::Rotation2d{units::radian_t{0.5}},
+        std::vector<wpi::math::Rotation2d> expectedDefault{
+            wpi::math::Rotation2d{wpi::units::radian_t{0.25}},
+            wpi::math::Rotation2d{wpi::units::radian_t{0.5}},
         };
-        std::vector<frc::Rotation2d> values{
-            frc::Rotation2d{units::radian_t{1.0}},
-            frc::Rotation2d{units::radian_t{2.0}},
+        std::vector<wpi::math::Rotation2d> values{
+            wpi::math::Rotation2d{wpi::units::radian_t{1.0}},
+            wpi::math::Rotation2d{wpi::units::radian_t{2.0}},
         };
 
-        table.Put("rotations", LogValue{PackRotations(values), std::string(wpi::GetStructTypeString<frc::Rotation2d>())});
+        table.Put("rotations", LogValue{PackRotations(values), std::string(wpi::util::GetStructTypeString<wpi::math::Rotation2d>())});
 
-        std::vector<frc::Rotation2d> actual = table.Get("rotations", expectedDefault);
+        std::vector<wpi::math::Rotation2d> actual = table.Get("rotations", expectedDefault);
 
         ASSERT_EQ(actual.size(), expectedDefault.size());
         for (size_t i = 0; i < actual.size(); ++i) {
@@ -189,12 +198,12 @@ namespace {
     TEST(LogTableStructTest, StructArrayReplayReturnsDefaultOnNonDivisibleRawSize) {
         LogStorage storage;
         LogTable table(storage);
-        std::vector<frc::Rotation2d> expectedDefault{frc::Rotation2d{units::radian_t{0.25}}};
-        std::vector<uint8_t> bytes(wpi::Struct<frc::Rotation2d>::GetSize() + 1, 0);
+        std::vector<wpi::math::Rotation2d> expectedDefault{wpi::math::Rotation2d{wpi::units::radian_t{0.25}}};
+        std::vector<uint8_t> bytes(wpi::util::Struct<wpi::math::Rotation2d>::GetSize() + 1, 0);
 
-        table.Put("rotations", LogValue{std::move(bytes), std::string(wpi::GetStructTypeString<frc::Rotation2d>()) + "[]"});
+        table.Put("rotations", LogValue{std::move(bytes), std::string(wpi::util::GetStructTypeString<wpi::math::Rotation2d>()) + "[]"});
 
-        std::vector<frc::Rotation2d> actual = table.Get("rotations", expectedDefault);
+        std::vector<wpi::math::Rotation2d> actual = table.Get("rotations", expectedDefault);
 
         ASSERT_EQ(actual.size(), expectedDefault.size());
         EXPECT_DOUBLE_EQ(actual[0].Radians().value(), expectedDefault[0].Radians().value());
@@ -357,14 +366,14 @@ namespace {
     TEST(LogTableStructTest, Struct2DArrayRoundTripUsesPerRowStructArrays) {
         LogStorage storage;
         LogTable table(storage);
-        const std::vector<std::vector<frc::Rotation2d>> expected{
-            {frc::Rotation2d{units::radian_t{0.5}}, frc::Rotation2d{units::radian_t{1.0}}},
-            {frc::Rotation2d{units::radian_t{1.5}}},
+        const std::vector<std::vector<wpi::math::Rotation2d>> expected{
+            {wpi::math::Rotation2d{wpi::units::radian_t{0.5}}, wpi::math::Rotation2d{wpi::units::radian_t{1.0}}},
+            {wpi::math::Rotation2d{wpi::units::radian_t{1.5}}},
         };
 
-        table.Put("rotations2d", std::span<const std::vector<frc::Rotation2d>>(expected));
+        table.Put("rotations2d", std::span<const std::vector<wpi::math::Rotation2d>>(expected));
 
-        const auto actual = table.Get("rotations2d", std::span<const std::vector<frc::Rotation2d>>(expected));
+        const auto actual = table.Get("rotations2d", std::span<const std::vector<wpi::math::Rotation2d>>(expected));
         ASSERT_EQ(actual.size(), expected.size());
         for (size_t row = 0; row < actual.size(); ++row) {
             ASSERT_EQ(actual[row].size(), expected[row].size());
@@ -406,7 +415,7 @@ namespace {
     TEST(LogTableParityTest, AggregateVectorFieldsUseArrayStorageAndRoundTrip) {
         LogStorage storage;
         LogTable table(storage);
-        const VectorAggregateInputs expected{{1.0, 2.0}, {7, 8}, {frc::Rotation2d{1_rad}}};
+        const VectorAggregateInputs expected{{1.0, 2.0}, {7, 8}, {wpi::math::Rotation2d{1_rad}}};
 
         table.Put("aggregate", expected);
 
@@ -478,40 +487,27 @@ namespace {
     TEST(LogTableProtobufTest, ProtobufOnlyTypeRoundTripsWithProtoTypeAndSchemas) {
         LogStorage storage;
         LogTable table(storage);
-        const frc::Trajectory expected = MakeTrajectory();
+        const wpi::math::HolonomicTrajectory expected = MakeTrajectory();
 
         table.Put("trajectory", expected);
 
         const LogValue* stored = table.Get("trajectory");
         ASSERT_NE(stored, nullptr);
         EXPECT_EQ(stored->type, akit::LoggableType::kRaw);
-        EXPECT_EQ(stored->customTypeStr, wpi::ProtobufMessage<frc::Trajectory>{}.GetTypeString());
+        EXPECT_EQ(stored->customTypeStr, wpi::util::ProtobufMessage<wpi::math::HolonomicTrajectory>{}.GetTypeString());
         EXPECT_TRUE(stored->customTypeStr.starts_with("proto:"));
         EXPECT_GE(CountProtobufSchemas(storage), 2u);
 
-        EXPECT_EQ(table.Get("trajectory", frc::Trajectory{}), expected);
-    }
-
-    TEST(LogTableProtobufTest, ProtobufOnlyAggregateUsesProtobufInsteadOfSubtable) {
-        LogStorage storage;
-        LogTable table(storage);
-        const frc::Trajectory::State expected = MakeTrajectory().States().back();
-
-        table.Put("state", expected);
-
-        const LogValue* stored = table.Get("state");
-        ASSERT_NE(stored, nullptr);
-        EXPECT_EQ(stored->customTypeStr, wpi::ProtobufMessage<frc::Trajectory::State>{}.GetTypeString());
-        EXPECT_EQ(table.Get("state", frc::Trajectory::State{}), expected);
+        EXPECT_EQ(table.Get("trajectory", DefaultTrajectory()), expected);
     }
 
     TEST(LogTableProtobufTest, TypeWithStructAndProtobufLogsAsStruct) {
         LogStorage storage;
         LogTable table(storage);
 
-        table.Put("rotation", frc::Rotation2d{1.0_rad});
+        table.Put("rotation", wpi::math::Rotation2d{1.0_rad});
 
-        EXPECT_EQ(table.Get("rotation")->customTypeStr, wpi::GetStructTypeString<frc::Rotation2d>());
+        EXPECT_EQ(table.Get("rotation")->customTypeStr, wpi::util::GetStructTypeString<wpi::math::Rotation2d>());
         EXPECT_EQ(CountProtobufSchemas(storage), 0u);
     }
 
@@ -519,21 +515,21 @@ namespace {
         LogStorage storage;
         LogTable table(storage);
         std::vector<uint8_t> bytes;
-        wpi::ProtobufMessage<frc::Trajectory>{}.Pack(bytes, MakeTrajectory());
+        wpi::util::ProtobufMessage<wpi::math::HolonomicTrajectory>{}.Pack(bytes, MakeTrajectory());
 
         table.Put("trajectory", LogValue{std::move(bytes), "proto:wrong.Type"});
 
-        EXPECT_EQ(table.Get("trajectory", frc::Trajectory{}), frc::Trajectory{});
+        EXPECT_EQ(table.Get("trajectory", DefaultTrajectory()), DefaultTrajectory());
     }
 
     TEST(LogTableProtobufTest, ProtobufReplayReturnsDefaultOnMalformedBytes) {
         LogStorage storage;
         LogTable table(storage);
-        const std::string typeString = wpi::ProtobufMessage<frc::Trajectory>{}.GetTypeString();
+        const std::string typeString = wpi::util::ProtobufMessage<wpi::math::HolonomicTrajectory>{}.GetTypeString();
 
         table.Put("trajectory", LogValue{std::vector<uint8_t>{0xFF, 0xFF, 0xFF}, typeString});
 
-        EXPECT_EQ(table.Get("trajectory", frc::Trajectory{}), frc::Trajectory{});
+        EXPECT_EQ(table.Get("trajectory", DefaultTrajectory()), DefaultTrajectory());
     }
 
     TEST(LoggerParityTest, MeasureRecordOutputUsesBaseUnits) {
@@ -576,7 +572,7 @@ namespace {
 
         const auto& storage = Logger::GetCurrentStorage();
         const auto& stored = storage.values.at("/RealOutputs/Trajectory");
-        EXPECT_EQ(stored.customTypeStr, wpi::ProtobufMessage<frc::Trajectory>{}.GetTypeString());
+        EXPECT_EQ(stored.customTypeStr, wpi::util::ProtobufMessage<wpi::math::HolonomicTrajectory>{}.GetTypeString());
         EXPECT_GE(CountProtobufSchemas(storage), 2u);
 
         Logger::End();

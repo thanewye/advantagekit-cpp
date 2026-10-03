@@ -8,11 +8,12 @@
 #include <vector>
 
 #include <gtest/gtest.h>
-#include <wpi/DataLogReader.h>
-#include <wpi/MemoryBuffer.h>
+#include <wpi/datalog/DataLogReader.hpp>
+#include <wpi/util/MemoryBuffer.hpp>
 
 #include "akit/log/LogStorage.h"
 #include "akit/log/LogTable.h"
+#include "akit/wpilog/WPILOGConstants.h"
 #include "akit/wpilog/WPILOGWriter.h"
 
 namespace {
@@ -54,7 +55,7 @@ namespace {
         }
 
         [[nodiscard]] std::map<std::string, int> CountDataRecordsByKey() const {
-            auto buffer = wpi::MemoryBuffer::GetFile(logPath_);
+            auto buffer = wpi::util::MemoryBuffer::GetFile(logPath_);
             EXPECT_TRUE(buffer.has_value());
             wpi::log::DataLogReader reader(std::move(*buffer));
             std::map<int, std::string> keysByEntry;
@@ -70,8 +71,28 @@ namespace {
             return recordCounts;
         }
 
+        [[nodiscard]] std::map<std::string, std::string> StartMetadataByKey() const {
+            auto buffer = wpi::util::MemoryBuffer::GetFile(logPath_);
+            EXPECT_TRUE(buffer.has_value());
+            wpi::log::DataLogReader reader(std::move(*buffer));
+            std::map<std::string, std::string> metadataByKey;
+            for (const auto& record : reader) {
+                wpi::log::StartRecordData startData;
+                if (record.IsStart() && record.GetStartData(&startData)) metadataByKey[std::string(startData.name)] = std::string(startData.metadata);
+            }
+            return metadataByKey;
+        }
+
         std::string logPath_;
     };
+
+    TEST_F(WPILOGWriterTest, TimestampEntryDeclaresNanosecondUnit) {
+        WriteLog({LogCycle{1'000'000, {{"Value", LogValue{1.0}}}}});
+
+        const auto metadataByKey = StartMetadataByKey();
+        EXPECT_EQ(metadataByKey.at("/Timestamp"), R"({"source":"AdvantageKit","unit":"nanoseconds"})");
+        EXPECT_EQ(metadataByKey.at("/Value"), akit::WPILOGConstants::kEntryMetadata);
+    }
 
     TEST_F(WPILOGWriterTest, UnchangedNaNIsWrittenOnce) {
         const double nan = std::numeric_limits<double>::quiet_NaN();

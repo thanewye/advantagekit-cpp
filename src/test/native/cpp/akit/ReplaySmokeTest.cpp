@@ -8,14 +8,14 @@
 #include <utility>
 #include <vector>
 
-#include <frc/DriverStation.h>
-#include <frc/RobotBase.h>
-#include <frc/simulation/DriverStationSim.h>
-#include <frc/simulation/SimHooks.h>
 #include <gtest/gtest.h>
-#include <units/time.h>
-#include <wpi/DataLogReader.h>
-#include <wpi/MemoryBuffer.h>
+#include <wpi/datalog/DataLogReader.hpp>
+#include <wpi/driverstation/internal/DriverStationBackend.hpp>
+#include <wpi/framework/RobotBase.hpp>
+#include <wpi/simulation/DriverStationSim.hpp>
+#include <wpi/simulation/SimHooks.hpp>
+#include <wpi/units/time.hpp>
+#include <wpi/util/MemoryBuffer.hpp>
 
 #include "akit/LoggedRobot.h"
 #include "akit/Logger.h"
@@ -37,7 +37,7 @@ namespace {
 
     constexpr size_t kCycleCount = 50;
     constexpr size_t kMaxReplayCycles = kCycleCount * 10;
-    constexpr units::second_t kLoopPeriod{0.02};
+    constexpr wpi::units::second_t kLoopPeriod{0.02};
 
     class ValidationLoggedRobot : public akit::LoggedRobot {};
 
@@ -50,13 +50,13 @@ namespace {
         Logger::ClearReceivers();
         Logger::SetReplaySource(nullptr);
         Logger::Clear();
-        frc::sim::DriverStationSim::ResetData();
-        frc::DriverStation::RefreshData();
+        wpi::sim::DriverStationSim::ResetData();
+        wpi::internal::DriverStationBackend::RefreshData();
     }
 
     std::vector<std::pair<int64_t, double>> ReadDoubleSeries(const std::string& path, std::string_view entryName) {
         std::vector<std::pair<int64_t, double>> series;
-        auto buffer = wpi::MemoryBuffer::GetFile(path);
+        auto buffer = wpi::util::MemoryBuffer::GetFile(path);
         if (!buffer) return series;
 
         wpi::log::DataLogReader reader(std::move(*buffer));
@@ -84,7 +84,7 @@ namespace {
             Logger::ProcessInputs("Smoke", inputs);
             Logger::RecordOutput("DoubledPosition", inputs.position * 2.0);
             Logger::PeriodicAfterUser();
-            frc::sim::StepTimingAsync(kLoopPeriod);
+            wpi::sim::StepTimingAsync(kLoopPeriod);
             Logger::PeriodicBeforeUser();
         }
 
@@ -115,12 +115,12 @@ namespace {
     class ReplaySmokeTest : public ::testing::Test {
     protected:
         void SetUp() override {
-            if (!frc::RobotBase::IsSimulation()) {
+            if (!wpi::RobotBase::IsSimulation()) {
                 GTEST_SKIP();
             }
             EnsureLoggedRobotValidationSatisfied();
             ResetLoggerState();
-            frc::sim::PauseTiming();
+            wpi::sim::PauseTiming();
 
             const auto tempDir = std::filesystem::temp_directory_path();
             realLogPath_ = (tempDir / "akit_smoke_real.wpilog").string();
@@ -129,7 +129,7 @@ namespace {
 
         void TearDown() override {
             ResetLoggerState();
-            frc::sim::ResumeTiming();
+            wpi::sim::ResumeTiming();
             std::error_code ec;
             std::filesystem::remove(realLogPath_, ec);
             std::filesystem::remove(replayLogPath_, ec);

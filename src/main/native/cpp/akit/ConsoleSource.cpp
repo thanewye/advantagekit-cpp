@@ -3,12 +3,39 @@
 #include "akit/ConsoleSource.h"
 
 #include <algorithm>
-#include <chrono>
-#include <fstream>
 #include <iostream>
 #include <utility>
 
-#include <frc/Errors.h>
+#include <cerrno>
+
+#ifndef _WIN32
+#include <csignal>
+#include <spawn.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#endif
+
+#ifdef __APPLE__
+#include <crt_externs.h>
+#endif
+
+#include <wpi/system/Errors.hpp>
+
+#ifndef _WIN32
+#ifndef __APPLE__
+extern char** environ;
+#endif
+
+namespace {
+    char** ProcessEnvironment() {
+#ifdef __APPLE__
+        return *_NSGetEnviron();
+#else
+        return environ;
+#endif
+    }
+} // namespace
+#endif
 
 namespace akit {
     ConsoleSource::Simulator::TeeStreambuf::TeeStreambuf(std::streambuf* first, std::streambuf* second, std::mutex& captureMutex)
@@ -72,15 +99,19 @@ namespace akit {
         return output;
     }
 
-    ConsoleSource::RoboRIO::RoboRIO()
-        : thread_([this] { Run(); }) {}
+    ConsoleSource::Systemcore::Systemcore() {
+        thread_ = std::thread([this] { Run(); });
+    }
 
-    ConsoleSource::RoboRIO::~RoboRIO() {
+    ConsoleSource::Systemcore::~Systemcore() {
         stop_ = true;
+#ifndef _WIN32
+        if (const pid_t childProcessId = childProcessId_.load(); childProcessId > 0) kill(childProcessId, SIGTERM);
+#endif
         if (thread_.joinable()) thread_.join();
     }
 
-    std::string ConsoleSource::RoboRIO::GetNewData() {
+    std::string ConsoleSource::Systemcore::GetNewData() {
         std::vector<std::string> drainedLines;
         {
             std::scoped_lock lock(mutex_);
@@ -95,29 +126,52 @@ namespace akit {
         return output;
     }
 
-    std::string ConsoleSource::RoboRIO::GetFilePath() {
-        return "/home/lvuser/FRC_UserProgram.log";
-    }
+    void ConsoleSource::Systemcore::Run() {
+#ifdef _WIN32
+        WPILIB_ReportError(wpi::err::Error, "[AdvantageKit] {}", "Systemcore console capture is not supported on Windows, disabling console capture.");
+#else
+        static constexpr const char* kJournalCommand =
+            "journalctl -f -u robot.service -n all -o cat _SYSTEMD_INVOCATION_ID=$(systemctl show -p InvocationID --value robot.service)";
 
-    void ConsoleSource::RoboRIO::Run() {
-        std::ifstream reader(GetFilePath());
-        if (!reader.is_open()) {
-            FRC_ReportError(frc::err::Error, "[AdvantageKit] {}", "Failed to open console file \"" + GetFilePath() + "\", disabling console capture.");
+        int pipeFileDescriptors[2];
+        if (pipe(pipeFileDescriptors) != 0) {
+            WPILIB_ReportError(wpi::err::Error, "[AdvantageKit] {}", "Failed to launch console capture process, disabling.");
             return;
         }
+        const int readFileDescriptor = pipeFileDescriptors[0];
+        const int writeFileDescriptor = pipeFileDescriptors[1];
+
+        posix_spawn_file_actions_t fileActions;
+        posix_spawn_file_actions_init(&fileActions);
+        posix_spawn_file_actions_adddup2(&fileActions, writeFileDescriptor, STDOUT_FILENO);
+        posix_spawn_file_actions_addclose(&fileActions, readFileDescriptor);
+        posix_spawn_file_actions_addclose(&fileActions, writeFileDescriptor);
+
+        char* const arguments[] = {const_cast<char*>("/bin/bash"), const_cast<char*>("-c"), const_cast<char*>(kJournalCommand), nullptr};
+        pid_t childProcessId = 0;
+        const int spawnResult = posix_spawn(&childProcessId, "/bin/bash", &fileActions, nullptr, arguments, ProcessEnvironment());
+        posix_spawn_file_actions_destroy(&fileActions);
+        close(writeFileDescriptor);
+
+        if (spawnResult != 0) {
+            close(readFileDescriptor);
+            WPILIB_ReportError(wpi::err::Error, "[AdvantageKit] {}", "Failed to launch console capture process, disabling.");
+            return;
+        }
+        childProcessId_ = childProcessId;
+        if (stop_) kill(childProcessId, SIGTERM);
 
         std::string buffer;
-        while (!stop_) {
-            char nextChar;
-            while (reader.get(nextChar)) {
-                buffer.push_back(nextChar);
+        char chunk[4096];
+        while (true) {
+            const ssize_t bytesRead = read(readFileDescriptor, chunk, sizeof(chunk));
+            if (bytesRead == 0) break;
+            if (bytesRead < 0) {
+                if (errno == EINTR) continue;
+                if (!stop_) WPILIB_ReportError(wpi::err::Error, "[AdvantageKit] {}", "Failed to read from console capture process, disabling.");
+                break;
             }
-
-            if (!reader.eof() && reader.fail()) {
-                FRC_ReportError(frc::err::Error, "[AdvantageKit] {}", "Failed to open console file \"" + GetFilePath() + "\", disabling console capture.");
-                return;
-            }
-            reader.clear();
+            buffer.append(chunk, static_cast<std::size_t>(bytesRead));
 
             std::size_t newlinePos = 0;
             while ((newlinePos = buffer.find('\n')) != std::string::npos) {
@@ -128,8 +182,12 @@ namespace akit {
                 }
                 buffer.erase(0, newlinePos + 1);
             }
-
-            std::this_thread::sleep_for(std::chrono::milliseconds(20));
         }
+
+        close(readFileDescriptor);
+        kill(childProcessId, SIGTERM);
+        waitpid(childProcessId, nullptr, 0);
+        childProcessId_ = 0;
+#endif
     }
 } // namespace akit

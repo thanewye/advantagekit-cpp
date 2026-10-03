@@ -1,17 +1,18 @@
 #pragma once
 
 #include <memory>
-#include <optional>
 
-#include <frc/PowerDistribution.h>
+#include <wpi/hardware/bus/CANPort.hpp>
+#include <wpi/hardware/power/PowerDistribution.hpp>
 
 #include "akit/log/LogTable.h"
 
 namespace akit {
     class LoggedPowerDistribution {
     public:
+        /** Returns the configured instance, or nullptr if GetInstance(busId, moduleID, moduleType) has not been called. */
         static LoggedPowerDistribution* GetInstance();
-        static LoggedPowerDistribution* GetInstance(int moduleID, frc::PowerDistribution::ModuleType moduleType);
+        static LoggedPowerDistribution* GetInstance(wpi::CANPort busId, int moduleID, wpi::PowerDistribution::ModuleType moduleType);
 
         /** Destroys the singleton instance, if any, releasing its HAL resources deterministically. */
         static void Reset();
@@ -19,13 +20,13 @@ namespace akit {
         void SaveToLog(LogTable table) const;
 
     private:
-        LoggedPowerDistribution();
-        LoggedPowerDistribution(int moduleID, frc::PowerDistribution::ModuleType moduleType);
+        LoggedPowerDistribution(wpi::CANPort busId, int moduleID, wpi::PowerDistribution::ModuleType moduleType);
 
+        wpi::CANPort busId_;
         int moduleID_;
-        std::optional<frc::PowerDistribution::ModuleType> moduleType_;
-        std::unique_ptr<frc::PowerDistribution> powerDistribution_;
+        wpi::PowerDistribution::ModuleType moduleType_;
+        std::unique_ptr<wpi::PowerDistribution> powerDistribution_;
 
-        inline static std::unique_ptr<LoggedPowerDistribution> instance_;
+        static std::unique_ptr<LoggedPowerDistribution> instance_;
     };
 } // namespace akit

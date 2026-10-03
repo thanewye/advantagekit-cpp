@@ -1,9 +1,10 @@
 #pragma once
 
-#include <frc/IterativeRobotBase.h>
+#include <wpi/framework/IterativeRobotBase.hpp>
+#include <wpi/hal/Types.h>
 
 namespace akit {
-    class LoggedRobot : public frc::IterativeRobotBase {
+    class LoggedRobot : public wpi::IterativeRobotBase {
     public:
         static constexpr double kDefaultPeriodSeconds = 0.02;
         static bool IsBaseConstructed() { return baseConstructed_; }
@@ -17,8 +18,8 @@ namespace akit {
         ~LoggedRobot() override;
 
     private:
-        uint64_t periodUs_;
-        uint64_t nextCycleUs_{0};
+        int64_t periodNs_;
+        int64_t nextCycleNs_{0};
         bool useTiming_{true};
         HAL_NotifierHandle notifier_;
         inline static bool baseConstructed_ = false;

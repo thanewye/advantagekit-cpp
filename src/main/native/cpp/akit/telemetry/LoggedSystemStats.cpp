@@ -3,66 +3,119 @@
 #include "akit/telemetry/LoggedSystemStats.h"
 
 #include <array>
-#include <chrono>
+#include <string>
+#include <string_view>
 
-#include <frc/RobotController.h>
-#include <hal/HAL.h>
-#include <networktables/NetworkTableInstance.h>
+#include <wpi/math/geometry/Quaternion.hpp>
+#include <wpi/math/geometry/Rotation2d.hpp>
+#include <wpi/math/geometry/Rotation3d.hpp>
+#include <wpi/nt/NetworkTableInstance.hpp>
+
+#include "akit/telemetry/detail/SystemReader.h"
 
 namespace akit {
+    namespace {
+        detail::SystemReader& Reader() {
+            static detail::SystemReader reader;
+            return reader;
+        }
+
+        void LogNetworkDirectionStatus(const LogTable& table, const detail::NetworkDirectionStatus& status) {
+            table.Put("Bandwidth", status.bandwidthKbps * 1.0e-3, "megabits per second");
+            table.Put("Kilobytes", status.bytes / 1024.0, "kilobytes");
+            table.Put("Dropped", status.dropped);
+            table.Put("Errors", status.errors);
+            table.Put("Packets", status.packets);
+        }
+
+        void LogNetworkStatus(const LogTable& table, const detail::NetworkStatus& status) {
+            LogNetworkDirectionStatus(table.GetSubtable("RX"), status.rx);
+            LogNetworkDirectionStatus(table.GetSubtable("TX"), status.tx);
+        }
+
+        void LogCANInfo(const LogTable& table, const detail::CANInfo& info) {
+            table.Put("MaxBandwidth", info.maxBandwidthMbps, "megabits per second");
+            table.Put("FD", info.isFd);
+            table.Put("Available", info.isAvailable);
+            table.Put("InterfaceUp", info.isUp);
+            table.Put("Utilization", info.utilizationPercent, "percent");
+            table.Put("Framerate", info.fps);
+        }
+
+        void LogVector3(const LogTable& table, const detail::Vector3& vector, std::string_view unit) {
+            table.Put("X", vector.x, unit);
+            table.Put("Y", vector.y, unit);
+            table.Put("Z", vector.z, unit);
+        }
+    } // namespace
+
     void LoggedSystemStats::SaveToLog(LogTable stats) {
-        int32_t status = 0;
-        stats.Put("FPGAVersion", static_cast<int64_t>(HAL_GetFPGAVersion(&status)));
-        stats.Put("FPGARevision", static_cast<int64_t>(HAL_GetFPGARevision(&status)));
+        const detail::SystemData data = Reader().Read();
 
-        WPI_String serialNum{};
-        HAL_GetSerialNumber(&serialNum);
-        std::string serial(serialNum.str, serialNum.len);
-        WPI_FreeString(&serialNum);
-        stats.Put("SerialNumber", std::string_view{serial});
+        stats.Put("BatteryVoltage", data.batteryVoltage, "volts");
+        stats.Put("WatchdogActive", data.watchdogActive);
+        stats.Put("IOFrequency", data.ioFrequency);
+        stats.Put("IORXFrequency", data.ioRxFrequency);
+        stats.Put("TeamNumber", data.teamNumber);
+        stats.Put("EpochTime", static_cast<double>(data.epochTime / 1000), "microseconds");
+        stats.Put("EpochTimeValid", data.epochTimeValid);
 
-        stats.Put("Comments", frc::RobotController::GetComments());
-        stats.Put("TeamNumber", static_cast<int64_t>(HAL_GetTeamNumber()));
-        stats.Put("FPGAButton", frc::RobotController::GetUserButton());
-        stats.Put("SystemActive", frc::RobotController::IsSysActive());
-        stats.Put("BrownedOut", frc::RobotController::IsBrownedOut());
-        stats.Put("CommsDisableCount", static_cast<int64_t>(frc::RobotController::GetCommsDisableCount()));
-        stats.Put("RSLState", frc::RobotController::GetRSLState());
-        stats.Put("SystemTimeValid", static_cast<bool>(HAL_GetSystemTimeValid(&status)));
+        stats.Put("Faults/Brownout", data.faultBrownout);
+        stats.Put("Faults/CANBusDown", data.faultCanbusDown);
+        stats.Put("Faults/CANBusUnavail", data.faultCanbusUnavail);
+        stats.Put("Faults/Display", data.faultDisplay);
+        stats.Put("Faults/IMU", data.faultIMU);
+        stats.Put("Faults/IO", data.faultIO);
+        stats.Put("Faults/RSL", data.faultRSL);
+        stats.Put("Faults/USB", data.faultUSB);
 
-        stats.Put("BatteryVoltage", frc::RobotController::GetBatteryVoltage().value());
-        stats.Put("BatteryCurrent", frc::RobotController::GetInputCurrent());
+        stats.Put("FaultCounts/Brownout", data.faultCountBrownout);
+        stats.Put("FaultCounts/CANBusDown", data.faultCountCanbusDown);
+        stats.Put("FaultCounts/CANBusUnavail", data.faultCountCanbusUnavail);
+        stats.Put("FaultCounts/Display", data.faultCountDisplay);
+        stats.Put("FaultCounts/IMU", data.faultCountIMU);
+        stats.Put("FaultCounts/IO", data.faultCountIO);
+        stats.Put("FaultCounts/RSL", data.faultCountRSL);
+        stats.Put("FaultCounts/USB", data.faultCountUSB);
 
-        stats.Put("3v3Rail/Voltage", frc::RobotController::GetVoltage3V3());
-        stats.Put("3v3Rail/Current", frc::RobotController::GetCurrent3V3());
-        stats.Put("3v3Rail/Active", frc::RobotController::GetEnabled3V3());
-        stats.Put("3v3Rail/CurrentFaults", static_cast<int64_t>(frc::RobotController::GetFaultCount3V3()));
+        LogNetworkStatus(stats.GetSubtable("Network/Ethernet"), data.networkEthernet);
+        LogNetworkStatus(stats.GetSubtable("Network/WiFi"), data.networkWiFi);
+        LogNetworkStatus(stats.GetSubtable("Network/USBTether"), data.networkUSBTether);
+        for (int bus = 0; bus < detail::kNumCANBuses; bus++) {
+            const LogTable busTable = stats.GetSubtable("Network/CAN" + std::to_string(bus));
+            LogNetworkStatus(busTable, data.networkCAN[bus]);
+            LogCANInfo(busTable, data.networkCANInfo[bus]);
+        }
 
-        stats.Put("5vRail/Voltage", frc::RobotController::GetVoltage5V());
-        stats.Put("5vRail/Current", frc::RobotController::GetCurrent5V());
-        stats.Put("5vRail/Active", frc::RobotController::GetEnabled5V());
-        stats.Put("5vRail/CurrentFaults", static_cast<int64_t>(frc::RobotController::GetFaultCount5V()));
+        stats.Put("CPU/Utilization", data.cpuPercent, "percent");
+        stats.Put("CPU/Temperature", data.cpuTemp, "celcius");
 
-        stats.Put("6vRail/Voltage", frc::RobotController::GetVoltage6V());
-        stats.Put("6vRail/Current", frc::RobotController::GetCurrent6V());
-        stats.Put("6vRail/Active", frc::RobotController::GetEnabled6V());
-        stats.Put("6vRail/CurrentFaults", static_cast<int64_t>(frc::RobotController::GetFaultCount6V()));
+        stats.Put("Memory/Usage", data.memoryUsageBytes * 1.0e-6, "megabytes");
+        stats.Put("Memory/Total", data.memoryTotalBytes * 1.0e-6, "megabytes");
+        stats.Put("Memory/Utilization", data.memoryPercent, "percent");
 
-        stats.Put("BrownoutVoltage", frc::RobotController::GetBrownoutVoltage().value());
-        stats.Put("CPUTempCelsius", frc::RobotController::GetCPUTemp().value());
+        stats.Put("Storage/Usage", data.storageUsageBytes * 1.0e-6, "megabytes");
+        stats.Put("Storage/Total", data.storageTotalBytes * 1.0e-6, "megabytes");
+        stats.Put("Storage/Utilization", data.storagePercent, "percent");
 
-        auto can = frc::RobotController::GetCANStatus();
-        stats.Put("CANBus/Utilization", can.percentBusUtilization);
-        stats.Put("CANBus/OffCount", static_cast<int64_t>(can.busOffCount));
-        stats.Put("CANBus/TxFullCount", static_cast<int64_t>(can.txFullCount));
-        stats.Put("CANBus/ReceiveErrorCount", static_cast<int64_t>(can.receiveErrorCount));
-        stats.Put("CANBus/TransmitErrorCount", static_cast<int64_t>(can.transmitErrorCount));
+        stats.Put("3v3Current", data.current3v3, "amps");
+        stats.Put("OS/Hash", std::string_view{data.osHash});
+        stats.Put("OS/Slot", std::string_view{data.osSlot});
+        stats.Put("OS/Version", std::string_view{data.osVersion});
 
-        stats.Put("EpochTimeMicros",
-                  static_cast<int64_t>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count()));
+        LogVector3(stats.GetSubtable("IMU/AccelRaw"), data.imuAccelRaw, "G");
+        LogVector3(stats.GetSubtable("IMU/GyroRates"), data.imuGyroRates, "degrees per second");
+        LogVector3(stats.GetSubtable("IMU/GyroEuler/Flat"), data.imuGyroEulerFlat, "degrees");
+        LogVector3(stats.GetSubtable("IMU/GyroEuler/Landscape"), data.imuGyroEulerLandscape, "degrees");
+        LogVector3(stats.GetSubtable("IMU/GyroEuler/Portrait"), data.imuGyroEulerPortrait, "degrees");
+        const auto& quaternion = data.imuGyroQuaternion;
+        stats.Put("IMU/Gyro3d", wpi::math::Rotation3d{wpi::math::Quaternion{quaternion.w, quaternion.x, quaternion.y, quaternion.z}});
+        stats.Put("IMU/GyroYaw/Flat", wpi::math::Rotation2d{wpi::units::radian_t{data.imuGyroYawFlat}});
+        stats.Put("IMU/GyroYaw/Landscape", wpi::math::Rotation2d{wpi::units::radian_t{data.imuGyroYawLandscape}});
+        stats.Put("IMU/GyroYaw/Portrait", wpi::math::Rotation2d{wpi::units::radian_t{data.imuGyroYawPortrait}});
 
         LogTable ntClients = stats.GetSubtable("NTClients");
-        auto ntConnections = nt::NetworkTableInstance::GetDefault().GetConnections();
+        const auto ntConnections = wpi::nt::NetworkTableInstance::GetDefault().GetConnections();
         std::unordered_set<std::string> currentRemoteIds;
 
         for (const auto& connection : ntConnections) {

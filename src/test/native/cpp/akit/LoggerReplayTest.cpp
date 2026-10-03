@@ -5,14 +5,16 @@
 #include <utility>
 #include <vector>
 
-#include <frc/DriverStation.h>
-#include <frc/GenericHID.h>
-#include <frc/Joystick.h>
-#include <frc/RobotBase.h>
-#include <frc/RobotController.h>
-#include <frc/simulation/DriverStationSim.h>
 #include <gtest/gtest.h>
-#include <hal/DriverStation.h>
+#include <wpi/driverstation/MatchType.hpp>
+#include <wpi/driverstation/POVDirection.hpp>
+#include <wpi/driverstation/internal/DriverStationBackend.hpp>
+#include <wpi/framework/RobotBase.hpp>
+#include <wpi/hal/DriverStation.h>
+#include <wpi/hal/DriverStationTypes.hpp>
+#include <wpi/hal/simulation/DriverStationData.h>
+#include <wpi/simulation/DriverStationSim.hpp>
+#include <wpi/system/RobotController.hpp>
 
 #include "akit/LoggedRobot.h"
 #include "akit/Logger.h"
@@ -28,6 +30,7 @@ namespace {
     using akit::LogReplaySource;
     using akit::LogStorage;
     using akit::LogTable;
+    using wpi::internal::DriverStationBackend;
 
     class ValidationLoggedRobot : public akit::LoggedRobot {
     public:
@@ -93,14 +96,14 @@ namespace {
         Logger::ClearReceivers();
         Logger::SetReplaySource(nullptr);
         Logger::Clear();
-        frc::sim::DriverStationSim::ResetData();
-        frc::DriverStation::RefreshData();
+        wpi::sim::DriverStationSim::ResetData();
+        DriverStationBackend::RefreshData();
     }
 
     class LoggerReplayParityTest : public ::testing::Test {
     protected:
         void SetUp() override {
-            if (!frc::RobotBase::IsSimulation()) {
+            if (!wpi::RobotBase::IsSimulation()) {
                 GTEST_SKIP();
             }
             EnsureLoggedRobotValidationSatisfied();
@@ -140,28 +143,40 @@ namespace {
     }
 
     TEST_F(LoggerReplayParityTest, ReplayBeforeUserUpdatesTimestampAndDriverStationState) {
+        static constexpr int64_t kUtilityOpModeId = HAL_MAKE_OPMODEID(HAL_ROBOT_MODE_UTILITY, 0x1234);
+
         StubReplaySource replaySource({
             ReplayFrame{
                 1'000,
                 [](LogTable& table) {
                     auto ds = table.GetSubtable("DriverStation");
                     ds.Put("Enabled", false);
-                    ds.Put("Autonomous", true);
+                    ds.Put("RobotMode", wpi::hal::RobotMode::AUTONOMOUS);
                     ds.Put("DSAttached", true);
                     ds.Put("FMSAttached", true);
                     ds.Put("MatchNumber", 4);
                     ds.Put("ReplayNumber", 1);
                     ds.Put("MatchType", static_cast<int64_t>(2));
                     ds.Put("EventName", "Week Zero");
+                    ds.Put("GameData", "ABC");
                     ds.Put("MatchTime", 15.0);
-                    ds.GetSubtable("Joystick0").Put("Name", "Replay Pad");
-                    ds.GetSubtable("Joystick0").Put("Type", static_cast<int64_t>(frc::GenericHID::HIDType::kHIDGamepad));
-                    ds.GetSubtable("Joystick0").Put("ButtonCount", 2);
-                    ds.GetSubtable("Joystick0").Put("ButtonValues", static_cast<int64_t>(0b01));
+                    auto joystick = ds.GetSubtable("Joystick0");
+                    joystick.Put("Name", "Replay Pad");
+                    joystick.Put("Type", static_cast<int64_t>(1));
+                    joystick.Put("IsGamepad", true);
+                    joystick.Put("ButtonsAvailable", static_cast<int64_t>(0b11));
+                    joystick.Put("ButtonValues", static_cast<int64_t>(0b01));
+                    joystick.Put("AxesAvailable", static_cast<int64_t>(0b1));
                     std::vector<float> axisValues{0.25f};
-                    ds.GetSubtable("Joystick0").Put("AxisValues", std::span<const float>(axisValues));
-                    std::vector<int> axisTypes{static_cast<int>(frc::Joystick::AxisType::kYAxis)};
-                    ds.GetSubtable("Joystick0").Put("AxisTypes", std::span<const int>(axisTypes));
+                    joystick.Put("AxisValues", std::span<const float>(axisValues));
+                    joystick.Put("POVsAvailable", static_cast<int64_t>(0b1));
+                    std::vector<int> povValues{HAL_JOYSTICK_POV_UP};
+                    joystick.Put("POVValues", std::span<const int>(povValues));
+                    joystick.Put("TouchpadCount", static_cast<int64_t>(1));
+                    joystick.Put("Touchpad/0/FingerCount", static_cast<int64_t>(1));
+                    joystick.Put("Touchpad/0/Finger/0/Down", true);
+                    joystick.Put("Touchpad/0/Finger/0/X", 0.5f);
+                    joystick.Put("Touchpad/0/Finger/0/Y", 0.25f);
                 },
             },
             ReplayFrame{
@@ -169,8 +184,8 @@ namespace {
                 [](LogTable& table) {
                     auto ds = table.GetSubtable("DriverStation");
                     ds.Put("Enabled", true);
-                    ds.Put("Autonomous", false);
-                    ds.Put("Test", true);
+                    ds.Put("RobotMode", wpi::hal::RobotMode::UTILITY);
+                    ds.Put("OpModeId", kUtilityOpModeId);
                     ds.Put("DSAttached", true);
                     ds.Put("FMSAttached", false);
                     ds.Put("MatchNumber", 9);
@@ -178,17 +193,15 @@ namespace {
                     ds.Put("MatchType", static_cast<int64_t>(3));
                     ds.Put("EventName", "Replay Event");
                     ds.Put("MatchTime", 9.5);
-                    ds.GetSubtable("Joystick0").Put("Name", "Updated Pad");
-                    ds.GetSubtable("Joystick0").Put("Type", static_cast<int64_t>(frc::GenericHID::HIDType::kHIDJoystick));
-                    ds.GetSubtable("Joystick0").Put("ButtonCount", 3);
-                    ds.GetSubtable("Joystick0").Put("ButtonValues", static_cast<int64_t>(0b101));
+                    auto joystick = ds.GetSubtable("Joystick0");
+                    joystick.Put("Name", "Updated Pad");
+                    joystick.Put("Type", static_cast<int64_t>(2));
+                    joystick.Put("IsGamepad", false);
+                    joystick.Put("ButtonsAvailable", static_cast<int64_t>(0b111));
+                    joystick.Put("ButtonValues", static_cast<int64_t>(0b101));
+                    joystick.Put("AxesAvailable", static_cast<int64_t>(0b11));
                     std::vector<float> axisValues{0.75f, -0.25f};
-                    ds.GetSubtable("Joystick0").Put("AxisValues", std::span<const float>(axisValues));
-                    std::vector<int> axisTypes{
-                        static_cast<int>(frc::Joystick::AxisType::kZAxis),
-                        static_cast<int>(frc::Joystick::AxisType::kTwistAxis),
-                    };
-                    ds.GetSubtable("Joystick0").Put("AxisTypes", std::span<const int>(axisTypes));
+                    joystick.Put("AxisValues", std::span<const float>(axisValues));
                 },
             },
         });
@@ -196,26 +209,42 @@ namespace {
         Logger::SetReplaySource(&replaySource);
         Logger::Start();
 
-        frc::DriverStation::RefreshData();
-        EXPECT_FALSE(frc::DriverStation::IsEnabled());
-        EXPECT_TRUE(frc::DriverStation::IsAutonomous());
-        EXPECT_EQ(frc::DriverStation::GetMatchNumber(), 4);
-        EXPECT_EQ(frc::DriverStation::GetReplayNumber(), 1);
-        EXPECT_EQ(frc::DriverStation::GetEventName(), "Week Zero");
-        EXPECT_EQ(frc::DriverStation::GetJoystickName(0), "Replay Pad");
+        DriverStationBackend::RefreshData();
+        EXPECT_FALSE(DriverStationBackend::IsEnabled());
+        EXPECT_TRUE(DriverStationBackend::IsAutonomous());
+        EXPECT_TRUE(DriverStationBackend::IsFMSAttached());
+        EXPECT_EQ(DriverStationBackend::GetMatchNumber(), 4);
+        EXPECT_EQ(DriverStationBackend::GetReplayNumber(), 1);
+        EXPECT_EQ(DriverStationBackend::GetMatchType(), wpi::MatchType::QUALIFICATION);
+        EXPECT_EQ(DriverStationBackend::GetEventName(), "Week Zero");
+        EXPECT_EQ(DriverStationBackend::GetGameData(), std::optional<std::string>{"ABC"});
+        EXPECT_EQ(DriverStationBackend::GetJoystickName(0), "Replay Pad");
+        EXPECT_TRUE(DriverStationBackend::GetJoystickIsGamepad(0));
+        EXPECT_EQ(DriverStationBackend::GetStickButtonsAvailable(0), 0b11u);
+        EXPECT_EQ(DriverStationBackend::GetStickButtons(0), 0b01u);
+        EXPECT_NEAR(DriverStationBackend::GetStickAxis(0, 0), 0.25, 1e-6);
+        EXPECT_EQ(DriverStationBackend::GetStickPOV(0, 0), wpi::POVDirection::UP);
+        const auto finger = DriverStationBackend::GetStickTouchpadFinger(0, 0, 0);
+        EXPECT_TRUE(finger.down);
+        EXPECT_NEAR(finger.x, 0.5f, 1e-6);
+        EXPECT_NEAR(finger.y, 0.25f, 1e-6);
 
         Logger::PeriodicBeforeUser();
 
         EXPECT_EQ(Logger::GetCurrentStorage().timestamp, 2'000);
-        frc::DriverStation::RefreshData();
-        EXPECT_TRUE(frc::DriverStation::IsEnabled());
-        EXPECT_FALSE(frc::DriverStation::IsAutonomous());
-        EXPECT_TRUE(frc::DriverStation::IsTest());
-        EXPECT_EQ(frc::DriverStation::GetMatchNumber(), 9);
-        EXPECT_EQ(frc::DriverStation::GetReplayNumber(), 2);
-        EXPECT_EQ(frc::DriverStation::GetEventName(), "Replay Event");
-        EXPECT_EQ(frc::DriverStation::GetJoystickName(0), "Updated Pad");
-        EXPECT_NEAR(frc::DriverStation::GetMatchTime().value(), 9.5, 1e-9);
+        DriverStationBackend::RefreshData();
+        EXPECT_TRUE(DriverStationBackend::IsEnabled());
+        EXPECT_FALSE(DriverStationBackend::IsAutonomous());
+        EXPECT_TRUE(DriverStationBackend::IsUtility());
+        EXPECT_EQ(DriverStationBackend::GetControlWord().GetOpModeId(), kUtilityOpModeId);
+        EXPECT_EQ(DriverStationBackend::GetMatchNumber(), 9);
+        EXPECT_EQ(DriverStationBackend::GetReplayNumber(), 2);
+        EXPECT_EQ(DriverStationBackend::GetEventName(), "Replay Event");
+        EXPECT_EQ(DriverStationBackend::GetJoystickName(0), "Updated Pad");
+        EXPECT_FALSE(DriverStationBackend::GetJoystickIsGamepad(0));
+        EXPECT_EQ(DriverStationBackend::GetStickButtons(0), 0b101u);
+        EXPECT_NEAR(DriverStationBackend::GetStickAxis(0, 1), -0.25, 1e-6);
+        EXPECT_NEAR(DriverStationBackend::GetMatchTime().value(), 9.5, 1e-9);
 
         // Must end while replaySource (a local) is still alive: Logger::replaySource_ would
         // otherwise dangle once this scope exits, and the fixture's TearDown() calls End() again.
@@ -286,7 +315,7 @@ namespace {
                 [](LogTable& table) {
                     auto systemStats = table.GetSubtable("SystemStats");
                     systemStats.Put("BatteryVoltage", 12.34);
-                    systemStats.Put("EpochTimeMicros", static_cast<int64_t>(123456789));
+                    systemStats.Put("EpochTime", 123456789.0, "microseconds");
                     systemStats.GetSubtable("NTClients").GetSubtable("ReplayClient").Put("Connected", true);
                 },
             },
@@ -299,10 +328,10 @@ namespace {
 
         const auto& values = Logger::GetCurrentStorage().values;
         ASSERT_TRUE(values.contains("/SystemStats/BatteryVoltage"));
-        ASSERT_TRUE(values.contains("/SystemStats/EpochTimeMicros"));
+        ASSERT_TRUE(values.contains("/SystemStats/EpochTime"));
         ASSERT_TRUE(values.contains("/SystemStats/NTClients/ReplayClient/Connected"));
         EXPECT_DOUBLE_EQ(std::get<double>(values.at("/SystemStats/BatteryVoltage").value), 12.34);
-        EXPECT_EQ(std::get<int64_t>(values.at("/SystemStats/EpochTimeMicros").value), 123456789);
+        EXPECT_DOUBLE_EQ(std::get<double>(values.at("/SystemStats/EpochTime").value), 123456789.0);
         EXPECT_TRUE(std::get<bool>(values.at("/SystemStats/NTClients/ReplayClient/Connected").value));
 
         Logger::End();
@@ -315,8 +344,8 @@ namespace {
         EXPECT_FALSE(Logger::HasReplaySource());
         EXPECT_GT(Logger::GetCurrentStorage().timestamp, 0);
 
-        const auto fpgaTimeUs = static_cast<int64_t>(frc::RobotController::GetFPGATime());
-        EXPECT_LE(std::llabs(Logger::GetCurrentStorage().timestamp - fpgaTimeUs), 100'000);
+        const int64_t monotonicTimeNs = wpi::RobotController::GetMonotonicTime();
+        EXPECT_LE(std::llabs(Logger::GetCurrentStorage().timestamp - monotonicTimeNs), 100'000'000);
 
         Logger::RecordOutput("RealValue", 3.5);
         const auto& values = Logger::GetCurrentStorage().values;
@@ -325,43 +354,68 @@ namespace {
     }
 
     TEST_F(LoggerReplayParityTest, DriverStationSaveUsesIntegerEncodingShape) {
-        frc::sim::DriverStationSim::SetAllianceStationId(HAL_AllianceStationID_kBlue2);
-        frc::sim::DriverStationSim::SetEventName("  Week Zero  ");
-        frc::sim::DriverStationSim::SetGameSpecificMessage("  ABC  ");
-        frc::sim::DriverStationSim::SetMatchNumber(4);
-        frc::sim::DriverStationSim::SetReplayNumber(1);
-        frc::sim::DriverStationSim::SetMatchType(frc::DriverStation::MatchType::kQualification);
-        frc::sim::DriverStationSim::SetJoystickName(0, "  Replay Pad  ");
-        frc::sim::DriverStationSim::SetJoystickType(0, 20);
-        frc::sim::DriverStationSim::SetJoystickAxisCount(0, 2);
-        frc::sim::DriverStationSim::SetJoystickAxisType(0, 0, 1);
-        frc::sim::DriverStationSim::SetJoystickAxisType(0, 1, 2);
-        frc::sim::DriverStationSim::NotifyNewData();
-        frc::DriverStation::RefreshData();
+        wpi::sim::DriverStationSim::SetAllianceStationId(wpi::hal::AllianceStationID::BLUE_2);
+        wpi::sim::DriverStationSim::SetEventName("Week Zero");
+        wpi::sim::DriverStationSim::SetGameData("  ABC  ");
+        wpi::sim::DriverStationSim::SetMatchNumber(4);
+        wpi::sim::DriverStationSim::SetReplayNumber(1);
+        wpi::sim::DriverStationSim::SetMatchType(wpi::MatchType::QUALIFICATION);
+        wpi::sim::DriverStationSim::SetMatchTime(12.5);
+        wpi::sim::DriverStationSim::SetRobotMode(wpi::hal::RobotMode::TELEOPERATED);
+        wpi::sim::DriverStationSim::SetJoystickName(0, "  Replay Pad  ");
+        wpi::sim::DriverStationSim::SetJoystickGamepadType(0, 20);
+        wpi::sim::DriverStationSim::SetJoystickIsGamepad(0, true);
+        wpi::sim::DriverStationSim::SetJoystickButtonsAvailable(0, 0b111);
+        wpi::sim::DriverStationSim::SetJoystickAxesAvailable(0, 0b11);
+        wpi::sim::DriverStationSim::SetJoystickAxis(0, 0, 0.5);
+        wpi::sim::DriverStationSim::SetJoystickAxis(0, 1, -1.0);
+        wpi::sim::DriverStationSim::SetJoystickPOVsAvailable(0, 0b1);
+        HALSIM_SetJoystickPOV(0, 0, HAL_JOYSTICK_POV_LEFT);
+        const uint8_t fingerCounts[HAL_MAX_JOYSTICK_TOUCHPADS] = {2, 0};
+        HALSIM_SetJoystickTouchpadCounts(0, 1, fingerCounts);
+        HALSIM_SetJoystickTouchpadFinger(0, 0, 1, true, 0.75, 0.125);
+        wpi::sim::DriverStationSim::NotifyNewData();
+        DriverStationBackend::RefreshData();
 
         LogStorage storage;
         LogTable table(storage);
         akit::LoggedDriverStation::SaveToLog(table.GetSubtable("DriverStation"));
 
         const auto& values = storage.values;
-        ASSERT_TRUE(values.contains("/DriverStation/AllianceStation"));
-        ASSERT_TRUE(values.contains("/DriverStation/EventName"));
-        ASSERT_TRUE(values.contains("/DriverStation/GameSpecificMessage"));
-        ASSERT_TRUE(values.contains("/DriverStation/MatchType"));
-        ASSERT_TRUE(values.contains("/DriverStation/Joystick0/Name"));
-        ASSERT_TRUE(values.contains("/DriverStation/Joystick0/Type"));
-        ASSERT_TRUE(values.contains("/DriverStation/Joystick0/AxisTypes"));
+        for (const char* removedKey :
+             {"/DriverStation/GameSpecificMessage", "/DriverStation/Autonomous", "/DriverStation/Test", "/DriverStation/Joystick0/Xbox",
+              "/DriverStation/Joystick0/ButtonCount", "/DriverStation/Joystick0/AxisTypes", "/DriverStation/Joystick0/POVs"}) {
+            EXPECT_FALSE(values.contains(removedKey)) << removedKey;
+        }
+
         EXPECT_EQ(values.at("/DriverStation/AllianceStation").type, akit::LoggableType::kInteger);
         EXPECT_EQ(values.at("/DriverStation/MatchType").type, akit::LoggableType::kInteger);
         EXPECT_EQ(values.at("/DriverStation/Joystick0/Type").type, akit::LoggableType::kInteger);
-        EXPECT_EQ(values.at("/DriverStation/Joystick0/AxisTypes").type, akit::LoggableType::kIntegerArray);
-        EXPECT_EQ(std::get<int64_t>(values.at("/DriverStation/AllianceStation").value), HAL_AllianceStationID_kBlue2);
+        EXPECT_EQ(std::get<int64_t>(values.at("/DriverStation/AllianceStation").value), HAL_ALLIANCE_STATION_BLUE_2);
         EXPECT_EQ(std::get<std::string>(values.at("/DriverStation/EventName").value), "Week Zero");
-        EXPECT_EQ(std::get<std::string>(values.at("/DriverStation/GameSpecificMessage").value), "ABC");
+        EXPECT_EQ(std::get<std::string>(values.at("/DriverStation/GameData").value), "  ABC  ");
         EXPECT_EQ(std::get<int64_t>(values.at("/DriverStation/MatchType").value), 2);
+        EXPECT_EQ(values.at("/DriverStation/MatchTime"), akit::LogValue(12.5, "", "seconds"));
+        EXPECT_EQ(std::get<std::string>(values.at("/DriverStation/RobotMode").value), "TELEOPERATED");
+        EXPECT_EQ(values.at("/DriverStation/OpModeId").type, akit::LoggableType::kInteger);
+        EXPECT_EQ(values.at("/DriverStation/OpMode").type, akit::LoggableType::kString);
+
         EXPECT_EQ(std::get<std::string>(values.at("/DriverStation/Joystick0/Name").value), "Replay Pad");
         EXPECT_EQ(std::get<int64_t>(values.at("/DriverStation/Joystick0/Type").value), 20);
-        EXPECT_EQ(std::get<std::vector<int64_t>>(values.at("/DriverStation/Joystick0/AxisTypes").value), (std::vector<int64_t>{1, 2}));
+        EXPECT_TRUE(std::get<bool>(values.at("/DriverStation/Joystick0/IsGamepad").value));
+        EXPECT_EQ(std::get<int64_t>(values.at("/DriverStation/Joystick0/ButtonsAvailable").value), 0b111);
+        EXPECT_EQ(std::get<int64_t>(values.at("/DriverStation/Joystick0/AxesAvailable").value), 0b11);
+        EXPECT_EQ(std::get<std::vector<float>>(values.at("/DriverStation/Joystick0/AxisValues").value), (std::vector<float>{0.5f, -1.0f}));
+        EXPECT_EQ(values.at("/DriverStation/Joystick0/AxisRawValues").type, akit::LoggableType::kIntegerArray);
+        EXPECT_EQ(std::get<std::vector<int64_t>>(values.at("/DriverStation/Joystick0/AxisRawValues").value).size(), 2u);
+        EXPECT_EQ(std::get<int64_t>(values.at("/DriverStation/Joystick0/POVsAvailable").value), 0b1);
+        EXPECT_EQ(std::get<std::vector<int64_t>>(values.at("/DriverStation/Joystick0/POVValues").value), (std::vector<int64_t>{HAL_JOYSTICK_POV_LEFT}));
+        EXPECT_EQ(std::get<int64_t>(values.at("/DriverStation/Joystick0/TouchpadCount").value), 1);
+        EXPECT_EQ(std::get<int64_t>(values.at("/DriverStation/Joystick0/Touchpad/0/FingerCount").value), 2);
+        EXPECT_FALSE(std::get<bool>(values.at("/DriverStation/Joystick0/Touchpad/0/Finger/0/Down").value));
+        EXPECT_TRUE(std::get<bool>(values.at("/DriverStation/Joystick0/Touchpad/0/Finger/1/Down").value));
+        EXPECT_FLOAT_EQ(std::get<float>(values.at("/DriverStation/Joystick0/Touchpad/0/Finger/1/X").value), 0.75f);
+        EXPECT_FLOAT_EQ(std::get<float>(values.at("/DriverStation/Joystick0/Touchpad/0/Finger/1/Y").value), 0.125f);
     }
 
 } // namespace

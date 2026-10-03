@@ -9,19 +9,19 @@
 #include <unordered_map>
 #include <vector>
 
-#include <frc/util/Color.h>
-#include <frc/util/Color8Bit.h>
 #include <magic_enum/magic_enum.hpp>
-#include <units/base.h>
-#include <wpi/protobuf/Protobuf.h>
-#include <wpi/struct/Struct.h>
+#include <wpi/units/base.hpp>
+#include <wpi/util/Color.hpp>
+#include <wpi/util/Color8Bit.hpp>
+#include <wpi/util/protobuf/Protobuf.hpp>
+#include <wpi/util/struct/Struct.hpp>
 
 #include "akit/log/LogStorage.h"
 
 namespace akit {
     namespace detail {
         template<typename BaseUnitType> constexpr std::string_view JavaUnitNameForDimension() {
-            namespace category = units::category;
+            namespace category = wpi::units::category;
             if constexpr (std::same_as<BaseUnitType, category::length_unit>) return "Meter";
             else if constexpr (std::same_as<BaseUnitType, category::time_unit>) return "Second";
             else if constexpr (std::same_as<BaseUnitType, category::mass_unit>) return "Kilogram";
@@ -41,16 +41,19 @@ namespace akit {
         }
 
         template<typename U> inline constexpr bool kIsBaseScaleUnit =
-            std::ratio_equal_v<typename units::traits::unit_traits<U>::conversion_ratio, std::ratio<1>> &&
-            std::ratio_equal_v<typename units::traits::unit_traits<U>::pi_exponent_ratio, std::ratio<0>> &&
-            std::ratio_equal_v<typename units::traits::unit_traits<U>::translation_ratio, std::ratio<0>>;
+            std::ratio_equal_v<typename wpi::units::traits::unit_traits<U>::conversion_ratio, std::ratio<1>> &&
+            std::ratio_equal_v<typename wpi::units::traits::unit_traits<U>::pi_exponent_ratio, std::ratio<0>> &&
+            std::ratio_equal_v<typename wpi::units::traits::unit_traits<U>::translation_ratio, std::ratio<0>>;
 
-        template<typename T> concept ProtobufOnlySerializable = wpi::ProtobufSerializable<T> && !wpi::StructSerializable<T>;
+        template<typename T>
+        concept ProtobufOnlySerializable = wpi::util::ProtobufSerializable<T> && !wpi::util::StructSerializable<T>;
 
-        template<typename T> concept HasPrimitiveArrayOverload = std::same_as<T, bool> || std::same_as<T, uint8_t> || std::same_as<T, int> ||
-                                                                 std::same_as<T, int64_t> || std::same_as<T, float> || std::same_as<T, double>;
+        template<typename T>
+        concept HasPrimitiveArrayOverload = std::same_as<T, bool> || std::same_as<T, uint8_t> || std::same_as<T, int> || std::same_as<T, int64_t> ||
+                                            std::same_as<T, float> || std::same_as<T, double>;
 
-        template<typename T> concept StructArrayElement = wpi::StructSerializable<T> && !HasPrimitiveArrayOverload<T>;
+        template<typename T>
+        concept StructArrayElement = wpi::util::StructSerializable<T> && !HasPrimitiveArrayOverload<T>;
     } // namespace detail
 
     class LoggableInputs;
@@ -119,9 +122,9 @@ namespace akit {
         }
 
         // wpilib strong units, logged in base units with java unit names
-        template<typename U> void Put(const std::string& key, units::unit_t<U> value) const {
-            using BaseUnitType = typename units::traits::unit_traits<U>::base_unit_type;
-            using BaseUnit = units::unit<std::ratio<1>, BaseUnitType>;
+        template<typename U> void Put(const std::string& key, wpi::units::unit_t<U> value) const {
+            using BaseUnitType = typename wpi::units::traits::unit_traits<U>::base_unit_type;
+            using BaseUnit = wpi::units::unit<std::ratio<1>, BaseUnitType>;
             const auto baseValue = value.template convert<BaseUnit>();
             constexpr std::string_view unitName = detail::JavaUnitNameForDimension<BaseUnitType>();
             if constexpr (unitName.empty()) {
@@ -132,41 +135,41 @@ namespace akit {
         }
 
         // wpilib colors, as hex string
-        void Put(const std::string& key, frc::Color value) const { Put(key, std::string_view{value.HexString()}); }
+        void Put(const std::string& key, wpi::util::Color value) const { Put(key, std::string_view{value.HexString()}); }
 
-        void Put(const std::string& key, frc::Color8Bit value) const { Put(key, std::string_view{value.HexString()}); }
+        void Put(const std::string& key, wpi::util::Color8Bit value) const { Put(key, std::string_view{value.HexString()}); }
 
         // wpilib struct type using the type string for custom type
-        template<wpi::StructSerializable T> void Put(const std::string& key, const T& value) const {
+        template<wpi::util::StructSerializable T> void Put(const std::string& key, const T& value) const {
             AddStructSchema<T>();
-            std::vector<uint8_t> buf(wpi::Struct<T>::GetSize());
-            wpi::PackStruct(std::span{buf}, value);
-            Put(key, LogValue{std::move(buf), std::string(wpi::GetStructTypeString<T>())});
+            std::vector<uint8_t> buf(wpi::util::Struct<T>::GetSize());
+            wpi::util::PackStruct(std::span{buf}, value);
+            Put(key, LogValue{std::move(buf), std::string(wpi::util::GetStructTypeString<T>())});
         }
 
         // vector of aforementioned structs
         template<detail::StructArrayElement T> void Put(const std::string& key, const std::vector<T>& values) const {
             AddStructSchema<T>();
-            const size_t elemSize = wpi::Struct<T>::GetSize();
+            const size_t elemSize = wpi::util::Struct<T>::GetSize();
             std::vector<uint8_t> buf(elemSize * values.size());
             for (size_t i = 0; i < values.size(); i++) {
-                wpi::PackStruct(std::span{buf}.subspan(i * elemSize, elemSize), values[i]);
+                wpi::util::PackStruct(std::span{buf}.subspan(i * elemSize, elemSize), values[i]);
             }
-            Put(key, LogValue{std::move(buf), std::string(wpi::GetStructTypeString<T>()) + "[]"});
+            Put(key, LogValue{std::move(buf), std::string(wpi::util::GetStructTypeString<T>()) + "[]"});
         }
 
         // span of aforementioned structs
-        template<wpi::StructSerializable T> void Put(const std::string& key, std::span<const T> values) const {
+        template<wpi::util::StructSerializable T> void Put(const std::string& key, std::span<const T> values) const {
             AddStructSchema<T>();
-            const size_t elemSize = wpi::Struct<T>::GetSize();
+            const size_t elemSize = wpi::util::Struct<T>::GetSize();
             std::vector<uint8_t> buf(elemSize * values.size());
             for (size_t i = 0; i < values.size(); i++) {
-                wpi::PackStruct(std::span{buf}.subspan(i * elemSize, elemSize), values[i]);
+                wpi::util::PackStruct(std::span{buf}.subspan(i * elemSize, elemSize), values[i]);
             }
-            Put(key, LogValue{std::move(buf), std::string(wpi::GetStructTypeString<T>()) + "[]"});
+            Put(key, LogValue{std::move(buf), std::string(wpi::util::GetStructTypeString<T>()) + "[]"});
         }
 
-        template<wpi::StructSerializable T> void Put(const std::string& key, std::span<const std::vector<T>> values) const {
+        template<wpi::util::StructSerializable T> void Put(const std::string& key, std::span<const std::vector<T>> values) const {
             Put(NormalizeKey(key, "length", false), static_cast<int64_t>(values.size()));
             for (size_t i = 0; i < values.size(); i++) {
                 Put(NormalizeKey(key, std::to_string(i), false), values[i]);
@@ -174,7 +177,7 @@ namespace akit {
         }
 
         template<detail::ProtobufOnlySerializable T> void Put(const std::string& key, const T& value) const {
-            wpi::ProtobufMessage<T> message;
+            wpi::util::ProtobufMessage<T> message;
             AddProtobufSchema(message);
             std::vector<uint8_t> buf;
             if (!message.Pack(buf, value)) return;
@@ -182,7 +185,7 @@ namespace akit {
         }
 
         template<typename T>
-        requires std::is_aggregate_v<T> && (!std::is_array_v<T>) && (!wpi::StructSerializable<T>) && (!wpi::ProtobufSerializable<T>) &&
+        requires std::is_aggregate_v<T> && (!std::is_array_v<T>) && (!wpi::util::StructSerializable<T>) && (!wpi::util::ProtobufSerializable<T>) &&
                  (!std::derived_from<T, LoggableInputs>)
         void Put(const std::string& key, const T& value) const;
 
@@ -271,44 +274,44 @@ namespace akit {
             return result;
         }
 
-        template<typename U> [[nodiscard]] units::unit_t<U> Get(std::string_view key, units::unit_t<U> defaultValue) const {
-            using BaseUnit = units::unit<std::ratio<1>, typename units::traits::unit_traits<U>::base_unit_type>;
+        template<typename U> [[nodiscard]] wpi::units::unit_t<U> Get(std::string_view key, wpi::units::unit_t<U> defaultValue) const {
+            using BaseUnit = wpi::units::unit<std::ratio<1>, typename wpi::units::traits::unit_traits<U>::base_unit_type>;
             const auto baseDefault = defaultValue.template convert<BaseUnit>();
-            return units::unit_t<U>{units::unit_t<BaseUnit>{Get(key, baseDefault.value())}};
+            return wpi::units::unit_t<U>{wpi::units::unit_t<BaseUnit>{Get(key, baseDefault.value())}};
         }
 
-        [[nodiscard]] frc::Color Get(std::string_view key, frc::Color defaultValue) const {
-            return frc::Color{Get(key, std::string{defaultValue.HexString()})};
+        [[nodiscard]] wpi::util::Color Get(std::string_view key, wpi::util::Color defaultValue) const {
+            return wpi::util::Color8Bit{Get(key, std::string{defaultValue.HexString()})};
         }
 
-        [[nodiscard]] frc::Color8Bit Get(std::string_view key, frc::Color8Bit defaultValue) const {
-            return frc::Color8Bit{Get(key, std::string{defaultValue.HexString()})};
+        [[nodiscard]] wpi::util::Color8Bit Get(std::string_view key, wpi::util::Color8Bit defaultValue) const {
+            return wpi::util::Color8Bit{Get(key, std::string{defaultValue.HexString()})};
         }
 
-        template<wpi::StructSerializable T> [[nodiscard]] T Get(std::string_view key, T defaultValue) const {
+        template<wpi::util::StructSerializable T> [[nodiscard]] T Get(std::string_view key, T defaultValue) const {
             const LogValue* lv = Get(key);
             if (!lv || lv->type != LoggableType::kRaw) return defaultValue;
-            if (lv->customTypeStr != wpi::GetStructTypeString<T>()) return defaultValue;
+            if (lv->customTypeStr != wpi::util::GetStructTypeString<T>()) return defaultValue;
             const auto& raw = std::get<std::vector<uint8_t>>(lv->value);
-            if (raw.size() != wpi::Struct<T>::GetSize()) return defaultValue;
-            return wpi::UnpackStruct<T>(raw);
+            if (raw.size() != wpi::util::Struct<T>::GetSize()) return defaultValue;
+            return wpi::util::UnpackStruct<T>(raw);
         }
 
         template<detail::StructArrayElement T> [[nodiscard]] std::vector<T> Get(std::string_view key, const std::vector<T>& defaultValue = {}) const {
             const LogValue* lv = Get(key);
             if (!lv || lv->type != LoggableType::kRaw) return defaultValue;
-            if (lv->customTypeStr != std::string(wpi::GetStructTypeString<T>()) + "[]") return defaultValue;
+            if (lv->customTypeStr != std::string(wpi::util::GetStructTypeString<T>()) + "[]") return defaultValue;
             const auto& raw = std::get<std::vector<uint8_t>>(lv->value);
-            const size_t elemSize = wpi::Struct<T>::GetSize();
+            const size_t elemSize = wpi::util::Struct<T>::GetSize();
             if (elemSize == 0 || raw.size() % elemSize != 0) return defaultValue;
             std::vector<T> result;
             result.reserve(raw.size() / elemSize);
             for (size_t i = 0; i < raw.size(); i += elemSize)
-                result.push_back(wpi::UnpackStruct<T>(std::span{raw}.subspan(i, elemSize)));
+                result.push_back(wpi::util::UnpackStruct<T>(std::span{raw}.subspan(i, elemSize)));
             return result;
         }
 
-        template<wpi::StructSerializable T>
+        template<wpi::util::StructSerializable T>
         [[nodiscard]] std::vector<std::vector<T>> Get(std::string_view key, std::span<const std::vector<T>> defaultValue) const {
             std::vector<std::vector<T>> defaults(defaultValue.begin(), defaultValue.end());
             const LogValue* lv = Get(NormalizeKey(key, "length", false));
@@ -328,7 +331,7 @@ namespace akit {
         template<detail::ProtobufOnlySerializable T> [[nodiscard]] T Get(std::string_view key, T defaultValue) const {
             const LogValue* lv = Get(key);
             if (!lv || lv->type != LoggableType::kRaw) return defaultValue;
-            wpi::ProtobufMessage<T> message;
+            wpi::util::ProtobufMessage<T> message;
             if (lv->customTypeStr != message.GetTypeString()) return defaultValue;
             auto unpacked = message.Unpack(std::get<std::vector<uint8_t>>(lv->value));
             if (!unpacked.has_value()) return defaultValue;
@@ -336,7 +339,7 @@ namespace akit {
         }
 
         template<typename T>
-        requires std::is_aggregate_v<T> && (!std::is_array_v<T>) && (!wpi::StructSerializable<T>) && (!wpi::ProtobufSerializable<T>) &&
+        requires std::is_aggregate_v<T> && (!std::is_array_v<T>) && (!wpi::util::StructSerializable<T>) && (!wpi::util::ProtobufSerializable<T>) &&
                  (!std::derived_from<T, LoggableInputs>)
         T Get(std::string_view key, T defaultValue) const;
 
@@ -372,8 +375,8 @@ namespace akit {
         std::string prefix_;
         int depth_ = 0;
 
-        template<wpi::StructSerializable T> void AddStructSchema() const {
-            wpi::ForEachStructSchema<T>([this](std::string_view typeStr, std::string_view schema) {
+        template<wpi::util::StructSerializable T> void AddStructSchema() const {
+            wpi::util::ForEachStructSchema<T>([this](std::string_view typeStr, std::string_view schema) {
                 std::string schemaKey = "/.schema/";
                 schemaKey += typeStr;
                 if (storage_->values.contains(schemaKey)) return;
@@ -382,13 +385,13 @@ namespace akit {
             });
         }
 
-        template<detail::ProtobufOnlySerializable T> void AddProtobufSchema(wpi::ProtobufMessage<T>& message) const {
-            message.ForEachProtobufDescriptor(
-                [this](std::string_view typeStr) { return storage_->values.contains("/.schema/" + std::string(typeStr)); },
-                [this](std::string_view typeStr, std::span<const uint8_t> descriptor) {
-                    std::vector<uint8_t> bytes(descriptor.begin(), descriptor.end());
-                    storage_->values.emplace("/.schema/" + std::string(typeStr), LogValue{std::move(bytes), "proto:FileDescriptorProto"});
-                });
+        template<detail::ProtobufOnlySerializable T> void AddProtobufSchema(wpi::util::ProtobufMessage<T>& message) const {
+            message.ForEachProtobufDescriptor([this](std::string_view typeStr) { return storage_->values.contains("/.schema/" + std::string(typeStr)); },
+                                              [this](std::string_view typeStr, std::span<const uint8_t> descriptor) {
+                                                  std::vector<uint8_t> bytes(descriptor.begin(), descriptor.end());
+                                                  storage_->values.emplace("/.schema/" + std::string(typeStr),
+                                                                           LogValue{std::move(bytes), "proto:FileDescriptorProto"});
+                                              });
         }
 
         template<typename T> T GetTyped(const std::string_view key, T defaultValue) const {

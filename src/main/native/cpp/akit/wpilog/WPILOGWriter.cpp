@@ -15,9 +15,9 @@
 #include <stdexcept>
 #include <utility>
 
-#include <frc/Errors.h>
-#include <frc/RobotBase.h>
-#include <frc/RobotController.h>
+#include <wpi/framework/RobotBase.hpp>
+#include <wpi/system/Errors.hpp>
+#include <wpi/system/RobotController.hpp>
 
 #include "akit/Logger.h"
 #include "akit/wpilog/WPILOGConstants.h"
@@ -87,10 +87,10 @@ namespace akit::wpilog {
         : WPILOGWriter(path, AdvantageScopeOpenBehavior::kAuto) {}
 
     WPILOGWriter::WPILOGWriter(AdvantageScopeOpenBehavior openBehavior)
-        : WPILOGWriter(frc::RobotBase::IsSimulation() ? kDefaultPathSim : kDefaultPathRio, openBehavior) {}
+        : WPILOGWriter(wpi::RobotBase::IsSimulation() ? kDefaultPathSim : kDefaultPathRio, openBehavior) {}
 
     WPILOGWriter::WPILOGWriter()
-        : WPILOGWriter(frc::RobotBase::IsSimulation() ? kDefaultPathSim : kDefaultPathRio, AdvantageScopeOpenBehavior::kAuto) {}
+        : WPILOGWriter(wpi::RobotBase::IsSimulation() ? kDefaultPathSim : kDefaultPathRio, AdvantageScopeOpenBehavior::kAuto) {}
 
     void WPILOGWriter::Start() {
         namespace fs = std::filesystem;
@@ -103,11 +103,13 @@ namespace akit::wpilog {
         std::error_code ec;
         log_ = std::make_unique<wpi::log::DataLogWriter>(logPath, ec, WPILOGConstants::kExtraHeader);
         if (ec) {
-            FRC_ReportError(frc::err::Error, "[AdvantageKit] Failed to open output log file.");
+            WPILIB_ReportError(wpi::err::Error, "[AdvantageKit] Failed to open output log file.");
             return;
         }
         isOpen_ = true;
-        timestampID_ = log_->Start(kTimestampKey, GetWPILOGType(LoggableType::kInteger), WPILOGConstants::kEntryMetadata, 0);
+        std::string timestampMetadata{WPILOGConstants::kEntryMetadataUnits};
+        timestampMetadata.replace(timestampMetadata.find("$UNITSTR"), 8, WPILOGConstants::kTimestampUnit);
+        timestampID_ = log_->Start(kTimestampKey, GetWPILOGType(LoggableType::kInteger), timestampMetadata, 0);
         cycle_ = 0;
 
         // reset data
@@ -125,10 +127,10 @@ namespace akit::wpilog {
         bool shouldOpenAscope = false;
         switch (openBehavior_) {
         case AdvantageScopeOpenBehavior::kAlways:
-            shouldOpenAscope = frc::RobotBase::IsSimulation();
+            shouldOpenAscope = wpi::RobotBase::IsSimulation();
             break;
         case AdvantageScopeOpenBehavior::kAuto:
-            shouldOpenAscope = frc::RobotBase::IsSimulation() && Logger::HasReplaySource();
+            shouldOpenAscope = wpi::RobotBase::IsSimulation() && Logger::HasReplaySource();
             break;
         case AdvantageScopeOpenBehavior::kNever:
             shouldOpenAscope = false;
@@ -146,7 +148,7 @@ namespace akit::wpilog {
 
                 std::cout << "[AdvantageKit] Log sent to AdvantageScope\n";
             } catch (const std::exception& e) {
-                FRC_ReportError(frc::err::Error, "[AdvantageKit] Failed to send log to AdvantageScope.");
+                WPILIB_ReportError(wpi::err::Error, "[AdvantageKit] Failed to send log to AdvantageScope.");
             }
         }
     }
@@ -162,11 +164,12 @@ namespace akit::wpilog {
         };
         if (autoRename_) {
             if (!logDate_.has_value()) {
-                if ((table.Get("DriverStation/DSAttached", false) && table.Get("SystemStats/SystemTimeValid", false)) || frc::RobotBase::IsSimulation()) {
+                if ((table.Get("DriverStation/DSAttached", false) && table.Get("SystemStats/EpochTimeValid", false)) || wpi::RobotBase::IsSimulation()) {
                     if (!dsAttachedTime_.has_value()) {
-                        dsAttachedTime_ = static_cast<double>(frc::RobotController::GetFPGATime()) / 1000000.0;
-                    } else if (static_cast<double>(frc::RobotController::GetFPGATime()) / 1000000.0 - dsAttachedTime_.value() > kTimestampUpdateDelay ||
-                               frc::RobotBase::IsSimulation()) {
+                        dsAttachedTime_ = static_cast<double>(wpi::RobotController::GetMonotonicTime()) / 1'000'000'000.0;
+                    } else if (static_cast<double>(wpi::RobotController::GetMonotonicTime()) / 1'000'000'000.0 - dsAttachedTime_.value() >
+                                   kTimestampUpdateDelay ||
+                               wpi::RobotBase::IsSimulation()) {
                         const auto now = std::chrono::system_clock::now();
                         const std::time_t t = std::chrono::system_clock::to_time_t(now);
                         logDate_ = LocalTime(t);
@@ -178,28 +181,28 @@ namespace akit::wpilog {
             HAL_MatchType matchType;
             switch (table.Get("DriverStation/MatchType", static_cast<int64_t>(0))) {
             case 1:
-                matchType = HAL_kMatchType_practice;
+                matchType = HAL_MATCH_TYPE_PRACTICE;
                 break;
             case 2:
-                matchType = HAL_kMatchType_qualification;
+                matchType = HAL_MATCH_TYPE_QUALIFICATION;
                 break;
             case 3:
-                matchType = HAL_kMatchType_elimination;
+                matchType = HAL_MATCH_TYPE_ELIMINATION;
                 break;
             default:
-                matchType = HAL_kMatchType_none;
+                matchType = HAL_MATCH_TYPE_NONE;
                 break;
             }
-            if (!logMatchText_.has_value() && matchType != HAL_kMatchType_none) {
+            if (!logMatchText_.has_value() && matchType != HAL_MATCH_TYPE_NONE) {
                 logMatchText_ = "";
                 switch (matchType) {
-                case HAL_kMatchType_practice:
+                case HAL_MATCH_TYPE_PRACTICE:
                     logMatchText_ = "p";
                     break;
-                case HAL_kMatchType_qualification:
+                case HAL_MATCH_TYPE_QUALIFICATION:
                     logMatchText_ = "q";
                     break;
-                case HAL_kMatchType_elimination:
+                case HAL_MATCH_TYPE_ELIMINATION:
                     logMatchText_ = "e";
                     break;
                 default:
@@ -261,8 +264,8 @@ namespace akit::wpilog {
             } else {
                 const bool presentLastCycle = entry.lastPresentCycle + 1 == cycle_;
                 const auto& lastValue = entry.lastWrittenValue;
-                appendData = !presentLastCycle || !lastValue.has_value() || lastValue->type != value.type ||
-                             lastValue->customTypeStr != value.customTypeStr || !LogValueVariantsEqual(lastValue->value, value.value);
+                appendData = !presentLastCycle || !lastValue.has_value() || lastValue->type != value.type || lastValue->customTypeStr != value.customTypeStr ||
+                             !LogValueVariantsEqual(lastValue->value, value.value);
 
                 if (entry.unit != value.unitStr) {
                     log_->SetMetadata(entry.id, getMetadata(value.unitStr), timestamp);

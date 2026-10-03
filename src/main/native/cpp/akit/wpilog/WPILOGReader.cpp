@@ -6,8 +6,8 @@
 #include <utility>
 #include <vector>
 
-#include <frc/Errors.h>
-#include <wpi/MemoryBuffer.h>
+#include <wpi/system/Errors.hpp>
+#include <wpi/util/MemoryBuffer.hpp>
 
 #include "akit/log/LogDataReceiver.h"
 #include "akit/log/LogStorage.h"
@@ -100,19 +100,19 @@ namespace akit::wpilog {
         entryCustomTypes_.clear();
         entryUnits_.clear();
 
-        auto buffer = wpi::MemoryBuffer::GetFile(filename_);
+        auto buffer = wpi::util::MemoryBuffer::GetFile(filename_);
         if (!buffer) {
-            FRC_ReportError(frc::err::Error, "[AdvantageKit] Failed to open replay log file.");
+            WPILIB_ReportError(wpi::err::Error, "[AdvantageKit] Failed to open replay log file.");
             return;
         }
 
         reader_ = std::make_unique<wpi::log::DataLogReader>(std::move(*buffer));
         if (!reader_->IsValid()) {
-            FRC_ReportError(frc::err::Error, "[AdvantageKit] The replay log is not a valid WPILOG file.");
+            WPILIB_ReportError(wpi::err::Error, "[AdvantageKit] The replay log is not a valid WPILOG file.");
             return;
         }
         if (reader_->GetExtraHeader() != WPILOGConstants::kExtraHeader) {
-            FRC_ReportError(frc::err::Error, "[AdvantageKit] The replay log was not produced by AdvantageKit.");
+            WPILIB_ReportError(wpi::err::Error, "[AdvantageKit] The replay log was not produced by AdvantageKit.");
             return;
         }
 
@@ -140,7 +140,12 @@ namespace akit::wpilog {
                     if ((type == LoggableType::kRaw && startData.type != "raw") || startData.type == "json") {
                         entryCustomTypes_.insert_or_assign(startData.entry, std::string(startData.type));
                     }
-                    if (auto unit = ParseUnit(startData.metadata)) entryUnits_.insert_or_assign(startData.entry, std::move(*unit));
+                    auto unit = ParseUnit(startData.metadata);
+                    if (startData.name == LogDataReceiver::kTimestampKey && unit != WPILOGConstants::kTimestampUnit) {
+                        throw WPILIB_MakeError(wpi::err::Error, "[AdvantageKit] The replay log uses an incompatible timestamp unit. Logs must be recorded and "
+                                                                "replayed on the same version of AdvantageKit.");
+                    }
+                    if (unit) entryUnits_.insert_or_assign(startData.entry, std::move(*unit));
                 } else if (record.IsSetMetadata()) {
                     wpi::log::MetadataRecordData metadataData;
                     if (!record.GetSetMetadataData(&metadataData)) continue;
@@ -163,7 +168,7 @@ namespace akit::wpilog {
                 continue;
             }
 
-            if (!timestamp_ || record.GetTimestamp() != *timestamp_) continue;
+            if (!timestamp_) continue;
             if (!entryName->second.starts_with('/')) continue;
 
             const std::string key = entryName->second.substr(1);

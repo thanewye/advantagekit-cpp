@@ -1,11 +1,11 @@
 #include <string>
 #include <string_view>
 
-#include <frc/geometry/Rotation2d.h>
 #include <gtest/gtest.h>
-#include <units/current.h>
-#include <units/length.h>
-#include <wpi/struct/Struct.h>
+#include <wpi/math/geometry/Rotation2d.hpp>
+#include <wpi/units/current.hpp>
+#include <wpi/units/length.hpp>
+#include <wpi/util/struct/Struct.hpp>
 
 #include "akit/LoggedRobot.h"
 #include "akit/Logger.h"
@@ -14,7 +14,7 @@
 
 enum class TestStructuredMode : uint8_t { kIdle = 0, kMoving = 1 };
 
-namespace wpi {
+namespace wpi::util {
     template<> struct Struct<TestStructuredMode> {
         static constexpr std::string_view GetTypeName() { return "TestStructuredMode"; }
         static constexpr size_t GetSize() { return 1; }
@@ -32,7 +32,7 @@ namespace wpi {
     };
 
     static_assert(StructSerializable<TestStructuredMode>);
-} // namespace wpi
+} // namespace wpi::util
 
 class GlobalScopeAutoLog {
 public:
@@ -43,7 +43,7 @@ public:
 
 namespace {
     using akit::Logger;
-    using namespace units::literals;
+    using namespace wpi::units::literals;
 
     class ValidationLoggedRobot : public akit::LoggedRobot {
     public:
@@ -68,7 +68,7 @@ namespace {
     public:
         UnitAutoLog() { distance = 4.25; }
 
-        AUTOLOG_OUTPUT(double, distance, akit::DefaultKey, units::meter_t);
+        AUTOLOG_OUTPUT(double, distance, akit::DefaultKey, wpi::units::meter_t);
     };
 
     class ExplicitUnitVariantsAutoLog {
@@ -78,15 +78,15 @@ namespace {
             height = 6.0;
         }
 
-        AUTOLOG_OUTPUT(double, current, akit::DefaultKey, units::ampere_t);
-        AUTOLOG_OUTPUT(double, height, akit::DefaultKey, units::inch_t);
+        AUTOLOG_OUTPUT(double, current, akit::DefaultKey, wpi::units::ampere_t);
+        AUTOLOG_OUTPUT(double, height, akit::DefaultKey, wpi::units::inch_t);
     };
 
     class StrongUnitAutoLog {
     public:
         StrongUnitAutoLog() { distance = 0.3048_m; }
 
-        AUTOLOG_OUTPUT(units::meter_t, distance);
+        AUTOLOG_OUTPUT(wpi::units::meter_t, distance);
     };
 
     class PrefixedAutoLog {
@@ -118,7 +118,7 @@ namespace {
 
     public:
         AUTOLOG_OUTPUT_SUPPLIER(appliedVoltage, rawDistance_ * 2.0);
-        AUTOLOG_OUTPUT_SUPPLIER(distanceMeters, rawDistance_, akit::DefaultKey, units::meter_t);
+        AUTOLOG_OUTPUT_SUPPLIER(distanceMeters, rawDistance_, akit::DefaultKey, wpi::units::meter_t);
         AUTOLOG_OUTPUT_SUPPLIER(mode, mode_, "Supplier/Mode", akit::NoUnitTag, akit::ForceSerializable);
     };
 
@@ -134,7 +134,7 @@ namespace {
         AUTOLOG_OUTPUT(double, velocity);
     };
 
-    static_assert(!akit::detail::kSupportsExplicitUnit<std::string, units::meter_t>);
+    static_assert(!akit::detail::kSupportsExplicitUnit<std::string, wpi::units::meter_t>);
 
     TEST(AutoLogOutputManagerTest, DefaultFieldKeyUsesClassNameAndCapitalizedMemberName) {
         EnsureLoggedRobotValidationSatisfied();
@@ -201,7 +201,7 @@ namespace {
 
         const auto& height = values.at("/RealOutputs/ExplicitUnitVariantsAutoLog/Height");
         ASSERT_TRUE(height.unitStr.has_value());
-        EXPECT_EQ(*height.unitStr, units::inch_t{0}.name());
+        EXPECT_EQ(*height.unitStr, wpi::units::inch_t{0}.name());
         EXPECT_DOUBLE_EQ(std::get<double>(height.value), 6.0);
 
         Logger::End();
@@ -261,7 +261,7 @@ namespace {
         EXPECT_EQ(*distance.unitStr, "Meter");
 
         const auto& mode = values.at("/RealOutputs/Supplier/Mode");
-        EXPECT_EQ(mode.customTypeStr, wpi::GetStructTypeString<TestStructuredMode>());
+        EXPECT_EQ(mode.customTypeStr, wpi::util::GetStructTypeString<TestStructuredMode>());
 
         Logger::End();
         Logger::Clear();
@@ -276,7 +276,7 @@ namespace {
         Logger::PeriodicAfterUser();
 
         const auto& stored = Logger::GetCurrentStorage().values.at("/RealOutputs/Superstructure/Mode");
-        EXPECT_EQ(stored.customTypeStr, wpi::GetStructTypeString<TestStructuredMode>());
+        EXPECT_EQ(stored.customTypeStr, wpi::util::GetStructTypeString<TestStructuredMode>());
 
         Logger::End();
         Logger::Clear();

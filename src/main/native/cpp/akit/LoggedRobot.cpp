@@ -5,84 +5,82 @@
 #include <exception>
 #include <iostream>
 
-#include <frc/RobotController.h>
-#include <hal/DriverStation.h>
-#include <hal/FRCUsageReporting.h>
-#include <hal/Notifier.h>
-#include <wpi/StackTrace.h>
+#include <wpi/driverstation/internal/DriverStationBackend.hpp>
+#include <wpi/hal/Notifier.hpp>
+#include <wpi/system/RobotController.hpp>
+#include <wpi/util/StackTrace.hpp>
+#include <wpi/util/Synchronization.hpp>
+#include <wpi/util/UsageReporting.hpp>
 
 #include "akit/Logger.h"
 
 namespace akit {
     LoggedRobot::LoggedRobot(double period)
-        : IterativeRobotBase(units::second_t{period})
-        , periodUs_(static_cast<uint64_t>(period * 1'000'000)) {
+        : IterativeRobotBase(wpi::units::second_t{period})
+        , periodNs_(static_cast<int64_t>(period * 1'000'000'000.0)) {
         baseConstructed_ = true;
         int32_t status = 0;
-        notifier_ = HAL_InitializeNotifier(&status);
+        notifier_ = HAL_CreateNotifier(&status);
         HAL_SetNotifierName(notifier_, "LoggedRobot", &status);
-        HAL_Report(HALUsageReporting::kResourceType_Framework, HALUsageReporting::kFramework_AdvantageKit);
-        HAL_Report(HALUsageReporting::kResourceType_LoggingFramework, HALUsageReporting::kLoggingFramework_AdvantageKit);
+        wpi::util::ReportUsage("Framework", "AdvantageKit");
+        wpi::util::ReportUsage("LoggingFramework", "AdvantageKit");
     }
 
     LoggedRobot::~LoggedRobot() {
-        int32_t status = 0;
-        HAL_StopNotifier(notifier_, &status);
-        HAL_CleanNotifier(notifier_);
+        if (notifier_ != HAL_INVALID_HANDLE) HAL_DestroyNotifier(notifier_);
     }
 
     void LoggedRobot::StartCompetition() {
-        uint64_t initStart = frc::RobotController::GetFPGATime();
-        RobotInit();
+        const int64_t initStart = wpi::RobotController::GetMonotonicTime();
         if (IsSimulation()) SimulationInit();
-        uint64_t initEnd = frc::RobotController::GetFPGATime();
+        const int64_t initEnd = wpi::RobotController::GetMonotonicTime();
 
-        Logger::PeriodicAfterUser(static_cast<int64_t>(initEnd - initStart), 0);
+        Logger::PeriodicAfterUser(initEnd - initStart, 0);
 
         std::cout << "********** Robot program startup complete **********" << std::endl;
-        HAL_ObserveUserProgramStarting();
+        wpi::internal::DriverStationBackend::ObserveUserProgramStarting();
 
         try {
             while (true) {
                 if (useTiming_) {
-                    uint64_t now = frc::RobotController::GetFPGATime();
-                    if (nextCycleUs_ < now) {
-                        nextCycleUs_ = now;
+                    const int64_t now = wpi::RobotController::GetMonotonicTime();
+                    if (nextCycleNs_ < now) {
+                        nextCycleNs_ = now;
                     } else {
                         int32_t status = 0;
-                        HAL_UpdateNotifierAlarm(notifier_, nextCycleUs_, &status);
-                        if (HAL_WaitForNotifierAlarm(notifier_, &status) == 0) {
+                        HAL_SetNotifierAlarm(notifier_, nextCycleNs_, 0, true, true, &status);
+                        if (!wpi::util::WaitForObject(notifier_)) {
                             Logger::End();
                             return;
                         }
                     }
-                    nextCycleUs_ += periodUs_;
+                    nextCycleNs_ += periodNs_;
                 }
 
-                uint64_t beforeStart = frc::RobotController::GetFPGATime();
+                const int64_t beforeStart = wpi::RobotController::GetMonotonicTime();
                 Logger::PeriodicBeforeUser();
                 if (!Logger::IsRunning()) {
                     return;
                 }
-                uint64_t userStart = frc::RobotController::GetFPGATime();
+                const int64_t userStart = wpi::RobotController::GetMonotonicTime();
                 LoopFunc();
-                uint64_t userEnd = frc::RobotController::GetFPGATime();
+                const int64_t userEnd = wpi::RobotController::GetMonotonicTime();
 
-                Logger::PeriodicAfterUser(static_cast<int64_t>(userEnd - userStart), static_cast<int64_t>(userStart - beforeStart));
+                Logger::PeriodicAfterUser(userEnd - userStart, userStart - beforeStart);
             }
         } catch (const std::exception& e) {
-            Logger::PeriodicAfterUser(0, 0, std::string{e.what()} + "\n" + wpi::GetStackTrace(0));
+            Logger::PeriodicAfterUser(0, 0, std::string{e.what()} + "\n" + wpi::util::GetStackTrace(0));
             Logger::End();
             throw;
         } catch (...) {
-            Logger::PeriodicAfterUser(0, 0, wpi::GetStackTrace(0));
+            Logger::PeriodicAfterUser(0, 0, wpi::util::GetStackTrace(0));
             Logger::End();
             throw;
         }
     }
 
     void LoggedRobot::EndCompetition() {
-        int32_t status = 0;
-        HAL_StopNotifier(notifier_, &status);
+        HAL_DestroyNotifier(notifier_);
+        notifier_ = HAL_INVALID_HANDLE;
     }
 } // namespace akit

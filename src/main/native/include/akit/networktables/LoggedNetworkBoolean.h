@@ -3,7 +3,7 @@
 #include <string>
 #include <string_view>
 
-#include <networktables/BooleanTopic.h>
+#include <wpi/nt/BooleanTopic.hpp>
 
 #include "akit/networktables/LoggedNetworkInput.h"
 
@@ -23,7 +23,7 @@ namespace akit::networktables {
 
     private:
         std::string key_;
-        nt::BooleanEntry entry_;
+        wpi::nt::BooleanEntry entry_;
         bool defaultValue_ = false;
         bool value_ = false;
     };

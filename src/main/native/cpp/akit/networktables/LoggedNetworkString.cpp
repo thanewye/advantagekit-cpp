@@ -2,14 +2,14 @@
 
 #include "akit/networktables/LoggedNetworkString.h"
 
-#include <networktables/NetworkTableInstance.h>
+#include <wpi/nt/NetworkTableInstance.hpp>
 
 #include "akit/Logger.h"
 
 namespace akit::networktables {
     LoggedNetworkString::LoggedNetworkString(const std::string_view key)
         : key_(key)
-        , entry_(nt::NetworkTableInstance::GetDefault().GetStringTopic(key).GetEntry(""))
+        , entry_(wpi::nt::NetworkTableInstance::GetDefault().GetStringTopic(key).GetEntry(""))
         , value_(defaultValue_) {
         Logger::RegisterDashboardInput(this);
     }

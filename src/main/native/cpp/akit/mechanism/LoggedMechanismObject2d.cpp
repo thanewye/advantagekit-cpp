@@ -2,14 +2,15 @@
 
 #include "akit/mechanism/LoggedMechanismObject2d.h"
 
-#include <frc/geometry/Rotation3d.h>
-#include <frc/geometry/Transform3d.h>
-#include <frc/geometry/Translation3d.h>
-#include <units/angle.h>
-#include <units/length.h>
+#include <wpi/math/geometry/Rotation3d.hpp>
+#include <wpi/math/geometry/Transform3d.hpp>
+#include <wpi/math/geometry/Translation3d.hpp>
+#include <wpi/telemetry/TelemetryTable.hpp>
+#include <wpi/units/angle.hpp>
+#include <wpi/units/length.hpp>
 
 namespace akit::mechanism {
-    using namespace units::literals;
+    using namespace wpi::units::literals;
 
     LoggedMechanismObject2d::LoggedMechanismObject2d(std::string_view name)
         : name_{name} {}
@@ -18,12 +19,10 @@ namespace akit::mechanism {
         return name_;
     }
 
-    void LoggedMechanismObject2d::Update(std::shared_ptr<nt::NetworkTable> table) {
+    void LoggedMechanismObject2d::LogTo(wpi::telemetry::TelemetryTable& table) const {
         std::scoped_lock lock(mutex_);
-        table_ = table;
-        UpdateEntries(table_);
         for (const auto& [name, object] : objects_) {
-            object->Update(table_->GetSubTable(name));
+            table.Log(name, *object);
         }
     }
 
@@ -35,16 +34,16 @@ namespace akit::mechanism {
         }
     }
 
-    std::vector<frc::Pose3d> LoggedMechanismObject2d::Generate3dMechanism(const frc::Pose3d& seed) const {
+    std::vector<wpi::math::Pose3d> LoggedMechanismObject2d::Generate3dMechanism(const wpi::math::Pose3d& seed) const {
         std::scoped_lock lock(mutex_);
-        std::vector<frc::Pose3d> poses;
+        std::vector<wpi::math::Pose3d> poses;
         for (const auto& [name, object] : objects_) {
-            const frc::Rotation3d pitchFromAngle{0_rad, units::degree_t{-object->GetAngle()}, 0_rad};
-            const frc::Pose3d pose{seed.Translation(), seed.Rotation().RotateBy(pitchFromAngle)};
+            const wpi::math::Rotation3d pitchFromAngle{0_rad, wpi::units::degree_t{-object->GetAngle()}, 0_rad};
+            const wpi::math::Pose3d pose{seed.Translation(), seed.Rotation().RotateBy(pitchFromAngle)};
             poses.push_back(pose);
 
-            const frc::Pose3d childSeed =
-                pose.TransformBy(frc::Transform3d{frc::Translation3d{units::meter_t{object->GetObject2dRange()}, 0_m, 0_m}, frc::Rotation3d{}});
+            const wpi::math::Pose3d childSeed = pose.TransformBy(
+                wpi::math::Transform3d{wpi::math::Translation3d{wpi::units::meter_t{object->GetObject2dRange()}, 0_m, 0_m}, wpi::math::Rotation3d{}});
             const auto childPoses = object->Generate3dMechanism(childSeed);
             poses.insert(poses.end(), childPoses.begin(), childPoses.end());
         }

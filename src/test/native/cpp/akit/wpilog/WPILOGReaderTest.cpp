@@ -7,10 +7,11 @@
 #include <vector>
 
 #include <gtest/gtest.h>
-#include <wpi/DataLogWriter.h>
+#include <wpi/datalog/DataLogWriter.hpp>
 
 #include "akit/log/LogStorage.h"
 #include "akit/log/LogTable.h"
+#include "akit/wpilog/WPILOGConstants.h"
 #include "akit/wpilog/WPILOGReader.h"
 #include "akit/wpilog/WPILOGWriter.h"
 
@@ -20,6 +21,12 @@ namespace {
     using akit::LogValue;
     using akit::wpilog::WPILOGReader;
     using akit::wpilog::WPILOGWriter;
+
+    std::string MetadataWithUnit(std::string_view unit) {
+        std::string metadata{akit::WPILOGConstants::kEntryMetadataUnits};
+        metadata.replace(metadata.find("$UNITSTR"), 8, unit);
+        return metadata;
+    }
 
     struct LogCycle {
         int64_t timestamp;
@@ -192,5 +199,50 @@ namespace {
         LogTable table(storage);
 
         EXPECT_FALSE(reader.UpdateTable(table));
+    }
+
+    TEST_F(WPILOGReaderTest, LogWithMicrosecondTimestampsIsRejected) {
+        {
+            std::error_code ec;
+            wpi::log::DataLogWriter log(logPath_, ec, akit::WPILOGConstants::kExtraHeader);
+            ASSERT_FALSE(ec);
+            const int entry = log.Start("/Timestamp", "int64", akit::WPILOGConstants::kEntryMetadata, 0);
+            log.AppendInteger(entry, 1'000, 1'000);
+        }
+
+        WPILOGReader reader(logPath_);
+        reader.Start();
+        LogStorage storage;
+        LogTable table(storage);
+
+        EXPECT_THROW(reader.UpdateTable(table), std::runtime_error);
+    }
+
+    TEST_F(WPILOGReaderTest, ValuesWithRecordTimestampsOffTheCycleTimestampAreStillApplied) {
+        {
+            std::error_code ec;
+            wpi::log::DataLogWriter log(logPath_, ec, akit::WPILOGConstants::kExtraHeader);
+            ASSERT_FALSE(ec);
+            const int timestampEntry = log.Start("/Timestamp", "int64", MetadataWithUnit("nanoseconds"), 0);
+            const int valueEntry = log.Start("/Inputs/Value", "double", akit::WPILOGConstants::kEntryMetadata, 0);
+            log.AppendInteger(timestampEntry, 1'000'000, 1'000'000);
+            log.AppendDouble(valueEntry, 1.5, 1'000'250);
+            log.AppendInteger(timestampEntry, 21'000'000, 21'000'000);
+            log.AppendDouble(valueEntry, 2.5, 21'000'000);
+            log.AppendInteger(timestampEntry, 41'000'000, 41'000'000);
+        }
+
+        WPILOGReader reader(logPath_);
+        reader.Start();
+        LogStorage storage;
+        LogTable table(storage);
+
+        ASSERT_TRUE(reader.UpdateTable(table));
+        EXPECT_EQ(storage.timestamp, 1'000'000);
+        EXPECT_EQ(storage.values.at("/Inputs/Value"), LogValue(1.5));
+
+        reader.UpdateTable(table);
+        EXPECT_EQ(storage.timestamp, 21'000'000);
+        EXPECT_EQ(storage.values.at("/Inputs/Value"), LogValue(2.5));
     }
 } // namespace

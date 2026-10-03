@@ -5,18 +5,18 @@
 #include <regex>
 #include <string>
 
-#include <frc/Notifier.h>
+#include <wpi/system/Notifier.hpp>
 
 #include "akit/log/LogTable.h"
 
 namespace akit {
     class RadioLogger {
     public:
-        static void Periodic(LogTable table);
+        static void Periodic(LogTable table, int64_t teamNumber);
         static void Stop();
 
     private:
-        static void Start();
+        static void Start(int64_t teamNumber);
         static std::mutex mutex_;
         static bool isConnected_;
         static std::string statusJson_;
@@ -25,6 +25,6 @@ namespace akit {
         static constexpr int kReadTimeoutSecs = 1;
         static constexpr int kRequestPeriodSecs = 5;
         static const std::regex kWhitespacePattern;
-        static std::unique_ptr<frc::Notifier> notifier_;
+        static std::unique_ptr<wpi::Notifier> notifier_;
     };
 } // namespace akit

@@ -4,23 +4,22 @@
 #include <utility>
 #include <vector>
 
-#include <frc/Alert.h>
-#include <frc/DriverStation.h>
-#include <frc/RobotBase.h>
-#include <frc/RobotController.h>
-#include <frc/simulation/DriverStationSim.h>
-#include <frc/smartdashboard/SendableChooser.h>
-#include <frc/smartdashboard/SmartDashboard.h>
 #include <gtest/gtest.h>
-#include <networktables/NetworkTableInstance.h>
+#include <wpi/driverstation/internal/DriverStationBackend.hpp>
+#include <wpi/framework/RobotBase.hpp>
+#include <wpi/nt/NetworkTableInstance.hpp>
+#include <wpi/simulation/DriverStationSim.hpp>
+#include <wpi/system/RobotController.hpp>
+#include <wpi/tunables/Selectable.hpp>
+#include <wpi/util/Alert.hpp>
 
 #include "akit/ConsoleSource.h"
 #include "akit/LoggedRobot.h"
 #include "akit/Logger.h"
 #include "akit/log/LogReplaySource.h"
 #include "akit/log/LogTable.h"
-#include "akit/networktables/LoggedDashboardChooser.h"
 #include "akit/networktables/LoggedNetworkBoolean.h"
+#include "akit/networktables/LoggedNetworkChooser.h"
 #include "akit/networktables/LoggedNetworkNumber.h"
 #include "akit/networktables/LoggedNetworkString.h"
 
@@ -29,8 +28,8 @@ namespace {
     using akit::Logger;
     using akit::LogReplaySource;
     using akit::LogTable;
-    using akit::networktables::LoggedDashboardChooser;
     using akit::networktables::LoggedNetworkBoolean;
+    using akit::networktables::LoggedNetworkChooser;
     using akit::networktables::LoggedNetworkNumber;
     using akit::networktables::LoggedNetworkString;
 
@@ -91,14 +90,14 @@ namespace {
         Logger::SetReplaySource(nullptr);
         Logger::SetConsoleSource(std::unique_ptr<akit::ConsoleSource>{});
         Logger::Clear();
-        frc::sim::DriverStationSim::ResetData();
-        frc::DriverStation::RefreshData();
+        wpi::sim::DriverStationSim::ResetData();
+        wpi::internal::DriverStationBackend::RefreshData();
     }
 
     class DashboardRuntimeTest : public ::testing::Test {
     protected:
         void SetUp() override {
-            if (!frc::RobotBase::IsSimulation()) {
+            if (!wpi::RobotBase::IsSimulation()) {
                 GTEST_SKIP();
             }
             EnsureLoggedRobotValidationSatisfied();
@@ -112,7 +111,7 @@ namespace {
 
     TEST_F(DashboardRuntimeTest, LoggedNetworkBooleanReplaysLoggedValueInsteadOfLiveNetworkTables) {
         LoggedNetworkBoolean input("/ReplayBoolean", false);
-        nt::NetworkTableInstance::GetDefault().GetBooleanTopic("/ReplayBoolean").GetEntry(false).Set(false);
+        wpi::nt::NetworkTableInstance::GetDefault().GetBooleanTopic("/ReplayBoolean").GetEntry(false).Set(false);
 
         StubReplaySource replaySource({
             ReplayFrame{
@@ -143,7 +142,7 @@ namespace {
 
     TEST_F(DashboardRuntimeTest, LoggedNetworkNumberReplaysLoggedValueInsteadOfLiveNetworkTables) {
         LoggedNetworkNumber input("/ReplayNumber", 0.0);
-        nt::NetworkTableInstance::GetDefault().GetDoubleTopic("/ReplayNumber").GetEntry(0.0).Set(-1.0);
+        wpi::nt::NetworkTableInstance::GetDefault().GetDoubleTopic("/ReplayNumber").GetEntry(0.0).Set(-1.0);
 
         StubReplaySource replaySource({
             ReplayFrame{
@@ -174,7 +173,7 @@ namespace {
 
     TEST_F(DashboardRuntimeTest, LoggedNetworkStringReplaysLoggedValueInsteadOfLiveNetworkTables) {
         LoggedNetworkString input("/ReplayString", "default");
-        nt::NetworkTableInstance::GetDefault().GetStringTopic("/ReplayString").GetEntry("default").Set("live");
+        wpi::nt::NetworkTableInstance::GetDefault().GetStringTopic("/ReplayString").GetEntry("default").Set("live");
 
         StubReplaySource replaySource({
             ReplayFrame{
@@ -203,37 +202,40 @@ namespace {
         Logger::SetReplaySource(nullptr);
     }
 
-    TEST_F(DashboardRuntimeTest, LoggedDashboardChooserCopiesOptionsFromExistingSendableChooser) {
-        frc::SendableChooser<int> existing;
-        existing.AddOption("Alternate", 2);
-        existing.SetDefaultOption("Default", 1);
+    TEST_F(DashboardRuntimeTest, LoggedNetworkChooserCopiesOptionsFromExistingSelectable) {
+        wpi::tunables::Selectable<int> existing;
+        existing.Add("Alternate", 2);
+        existing.AddDefault("Default", 1);
 
-        LoggedDashboardChooser<int> chooser("WrappedChooser", existing);
+        LoggedNetworkChooser<int> chooser("WrappedChooser", existing);
         chooser.Periodic();
 
         EXPECT_EQ(chooser.Get(), 1);
+        EXPECT_EQ(existing.GetSelected(), 1);
 
-        existing.AddOption("Extra", 3);
-        EXPECT_EQ(chooser.GetSendableChooser().GetSelected(), "Default");
+        auto options = wpi::nt::NetworkTableInstance::GetDefault().GetStringArrayTopic("/WrappedChooser/options").Subscribe({});
+        EXPECT_EQ(options.Get(), (std::vector<std::string>{"Alternate", "Default"}));
+        auto defaultOption = wpi::nt::NetworkTableInstance::GetDefault().GetStringTopic("/WrappedChooser/default").Subscribe("");
+        EXPECT_EQ(defaultOption.Get(), "Default");
     }
 
-    TEST_F(DashboardRuntimeTest, LoggedDashboardChooserUsesLiveSelectionAndPersistsReplaySelection) {
-        LoggedDashboardChooser<int> chooser("ReplayChooser");
-        chooser.AddDefaultOption("Default", 1);
-        chooser.AddOption("Alternate", 2);
-        frc::SmartDashboard::UpdateValues();
+    TEST_F(DashboardRuntimeTest, LoggedNetworkChooserUsesLiveSelectionAndPersistsReplaySelection) {
+        LoggedNetworkChooser<int> chooser("ReplayChooser");
+        chooser.AddDefault("Default", 1);
+        chooser.Add("Alternate", 2);
 
-        auto selectedPublisher = nt::NetworkTableInstance::GetDefault().GetStringTopic("/SmartDashboard/ReplayChooser/selected").Publish();
+        auto selectedPublisher = wpi::nt::NetworkTableInstance::GetDefault().GetStringTopic("/ReplayChooser/selected/tune").Publish();
         selectedPublisher.Set("Alternate");
-        nt::NetworkTableInstance::GetDefault().FlushLocal();
-        frc::SmartDashboard::UpdateValues();
+        wpi::nt::NetworkTableInstance::GetDefault().FlushLocal();
 
         InstallNoopConsole();
         Logger::Start();
 
         EXPECT_EQ(chooser.Get(), 2);
-        ASSERT_TRUE(Logger::GetCurrentStorage().values.contains("/NetworkInputs/SmartDashboard/ReplayChooser"));
-        EXPECT_EQ(std::get<std::string>(Logger::GetCurrentStorage().values.at("/NetworkInputs/SmartDashboard/ReplayChooser").value), "Alternate");
+        ASSERT_TRUE(Logger::GetCurrentStorage().values.contains("/NetworkInputs/ReplayChooser"));
+        EXPECT_EQ(std::get<std::string>(Logger::GetCurrentStorage().values.at("/NetworkInputs/ReplayChooser").value), "Alternate");
+        auto activeSubscriber = wpi::nt::NetworkTableInstance::GetDefault().GetStringTopic("/ReplayChooser/selected/value").Subscribe("");
+        EXPECT_EQ(activeSubscriber.Get(), "Alternate");
 
         Logger::End();
         Logger::Clear();
@@ -241,13 +243,16 @@ namespace {
         StubReplaySource replaySource({
             ReplayFrame{
                 3'000,
-                [](LogTable& table) { table.GetSubtable("NetworkInputs").GetSubtable("SmartDashboard").Put("ReplayChooser", "Alternate"); },
+                [](LogTable& table) { table.GetSubtable("NetworkInputs").Put("ReplayChooser", "Alternate"); },
             },
             ReplayFrame{
                 4'000,
                 [](LogTable&) {},
             },
         });
+
+        selectedPublisher.Set("Default");
+        wpi::nt::NetworkTableInstance::GetDefault().FlushLocal();
 
         Logger::SetReplaySource(&replaySource);
         InstallNoopConsole();
@@ -256,17 +261,37 @@ namespace {
         EXPECT_EQ(chooser.Get(), 2);
         Logger::PeriodicBeforeUser();
         EXPECT_EQ(chooser.Get(), 2);
-        EXPECT_EQ(std::get<std::string>(Logger::GetCurrentStorage().values.at("/NetworkInputs/SmartDashboard/ReplayChooser").value), "Alternate");
+        EXPECT_EQ(std::get<std::string>(Logger::GetCurrentStorage().values.at("/NetworkInputs/ReplayChooser").value), "Alternate");
 
         Logger::End();
         Logger::SetReplaySource(nullptr);
     }
 
+    TEST_F(DashboardRuntimeTest, LoggedNetworkChooserNotifiesListenerOnSelectionChange) {
+        LoggedNetworkChooser<int> chooser("ListenerChooser");
+        chooser.AddDefault("Default", 1);
+        chooser.Add("Alternate", 2);
+
+        std::vector<int> notifiedValues;
+        chooser.OnChange([&notifiedValues](int value) { notifiedValues.push_back(value); });
+
+        auto selectedPublisher = wpi::nt::NetworkTableInstance::GetDefault().GetStringTopic("/ListenerChooser/selected/tune").Publish();
+        selectedPublisher.Set("Alternate");
+        wpi::nt::NetworkTableInstance::GetDefault().FlushLocal();
+        chooser.Periodic();
+        chooser.Periodic();
+
+        selectedPublisher.Set("Missing");
+        wpi::nt::NetworkTableInstance::GetDefault().FlushLocal();
+        chooser.Periodic();
+
+        EXPECT_EQ(notifiedValues, (std::vector<int>{2, 1}));
+        EXPECT_EQ(chooser.Get(), 1);
+    }
+
     TEST_F(DashboardRuntimeTest, AlertLoggerRecordsCanonicalOutputShape) {
-        frc::Alert alert("DriveAlerts", "Motor hot", frc::Alert::AlertType::kWarning);
+        wpi::util::Alert alert("DriveAlerts", "MotorHot", "Motor hot", wpi::util::Alert::Level::MEDIUM);
         alert.Set(true);
-        frc::SmartDashboard::UpdateValues();
-        nt::NetworkTableInstance::GetDefault().FlushLocal();
 
         InstallNoopConsole();
         Logger::Start();
@@ -295,7 +320,7 @@ namespace {
     }
 
     TEST(ConsoleSourceParityTest, SimulatorReturnsIncrementalStdoutAndStderrData) {
-        if (!frc::RobotBase::IsSimulation()) GTEST_SKIP();
+        if (!wpi::RobotBase::IsSimulation()) GTEST_SKIP();
 
         akit::ConsoleSource::Simulator source;
         std::cout << "stdout-one" << std::flush;

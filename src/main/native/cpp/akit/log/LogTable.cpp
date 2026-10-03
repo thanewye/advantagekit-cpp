@@ -4,7 +4,7 @@
 
 #include <utility>
 
-#include <frc/Errors.h>
+#include <wpi/system/Errors.hpp>
 
 namespace akit {
     LogTable::LogTable(LogStorage& storage, std::string prefix)
@@ -366,13 +366,13 @@ namespace akit {
         auto it = storage_->values.find(fullKey);
         if (it == storage_->values.end()) return true;
         if (it->second.type != type) {
-            FRC_ReportError(frc::err::Error, "[AdvantageKit] Failed to write to field \"{}\" — type mismatch (existing={} attempted={})", fullKey,
-                            static_cast<int>(it->second.type), static_cast<int>(type));
+            WPILIB_ReportError(wpi::err::Error, "[AdvantageKit] Failed to write to field \"{}\" — type mismatch (existing={} attempted={})", fullKey,
+                               static_cast<int>(it->second.type), static_cast<int>(type));
             return false;
         }
         if (it->second.customTypeStr != customTypeStr) {
-            FRC_ReportError(frc::err::Error, "[AdvantageKit] Struct type mismatch on \"{}\" (existing={} attempted={})", fullKey, it->second.customTypeStr,
-                            customTypeStr);
+            WPILIB_ReportError(wpi::err::Error, "[AdvantageKit] Struct type mismatch on \"{}\" (existing={} attempted={})", fullKey, it->second.customTypeStr,
+                               customTypeStr);
             return false;
         }
         return true;

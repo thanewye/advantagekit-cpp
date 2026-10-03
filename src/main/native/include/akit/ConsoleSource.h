@@ -17,7 +17,7 @@ namespace akit {
         [[nodiscard]] virtual std::string GetNewData() = 0;
 
         class Simulator;
-        class RoboRIO;
+        class Systemcore;
     };
 
     class ConsoleSource::Simulator final : public ConsoleSource {
@@ -55,20 +55,18 @@ namespace akit {
         std::mutex mutex_;
     };
 
-    class ConsoleSource::RoboRIO final : public ConsoleSource {
+    class ConsoleSource::Systemcore final : public ConsoleSource {
     public:
-        RoboRIO();
-        ~RoboRIO() override;
+        Systemcore();
+        ~Systemcore() override;
 
         [[nodiscard]] std::string GetNewData() override;
-
-    protected:
-        [[nodiscard]] static std::string GetFilePath();
 
     private:
         void Run();
 
         std::atomic_bool stop_{false};
+        std::atomic<int> childProcessId_{0};
         std::thread thread_;
         std::mutex mutex_;
         std::vector<std::string> lines_;

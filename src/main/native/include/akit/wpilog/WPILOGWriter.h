@@ -5,7 +5,7 @@
 #include <string>
 #include <unordered_map>
 
-#include <wpi/DataLogWriter.h>
+#include <wpi/datalog/DataLogWriter.hpp>
 
 #include "akit/log/LogDataReceiver.h"
 #include "akit/log/LoggableType.h"
