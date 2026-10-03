@@ -27,7 +27,7 @@ jobs:
             toolchain: ''
             options: ''
     name: Build ${{ matrix.name }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -58,7 +58,7 @@ jobs:
             name: Windows ARM64
             architecture: x64
             options: -Pbuildwinarm64 -Ponlywindowsarm64
-          - os: macos-14
+          - os: macos-15
             name: macOS universal
             architecture: aarch64
             options: -Pbuildalldesktop
