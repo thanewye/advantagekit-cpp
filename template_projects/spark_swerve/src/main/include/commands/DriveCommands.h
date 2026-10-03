@@ -9,8 +9,8 @@
 
 #include <functional>
 
-#include <frc/geometry/Rotation2d.h>
-#include <frc2/command/CommandPtr.h>
+#include <wpi/commands2/CommandPtr.hpp>
+#include <wpi/math/geometry/Rotation2d.hpp>
 
 #include "subsystems/drive/Drive.h"
 
@@ -18,24 +18,24 @@ namespace DriveCommands {
     /**
      * Field relative drive command using two joysticks (controlling linear and angular velocities).
      */
-    frc2::CommandPtr JoystickDrive(Drive* drive, std::function<double()> xSupplier, std::function<double()> ySupplier,
-                                   std::function<double()> omegaSupplier);
+    wpi::cmd::CommandPtr JoystickDrive(Drive* drive, std::function<double()> xSupplier, std::function<double()> ySupplier,
+                                       std::function<double()> omegaSupplier);
 
     /**
      * Field relative drive command using joystick for linear control and PID for angular control.
      * Possible use cases include snapping to an angle, aiming at a vision target, or controlling
      * absolute rotation with a joystick.
      */
-    frc2::CommandPtr JoystickDriveAtAngle(Drive* drive, std::function<double()> xSupplier, std::function<double()> ySupplier,
-                                          std::function<frc::Rotation2d()> rotationSupplier);
+    wpi::cmd::CommandPtr JoystickDriveAtAngle(Drive* drive, std::function<double()> xSupplier, std::function<double()> ySupplier,
+                                              std::function<wpi::math::Rotation2d()> rotationSupplier);
 
     /**
      * Measures the velocity feedforward constants for the drive motors.
      *
      * <p>This command should only be used in voltage control mode.
      */
-    frc2::CommandPtr FeedforwardCharacterization(Drive* drive);
+    wpi::cmd::CommandPtr FeedforwardCharacterization(Drive* drive);
 
     /** Measures the robot's wheel radius by spinning in a circle. */
-    frc2::CommandPtr WheelRadiusCharacterization(Drive* drive);
+    wpi::cmd::CommandPtr WheelRadiusCharacterization(Drive* drive);
 } // namespace DriveCommands

@@ -10,14 +10,14 @@
 #include <algorithm>
 #include <cmath>
 
-#include <frc/Timer.h>
-#include <frc/system/plant/LinearSystemId.h>
+#include <wpi/math/system/Models.hpp>
+#include <wpi/system/Timer.hpp>
 
 ModuleIOSim::ModuleIOSim(
     const swerve::SwerveModuleConstants<configs::TalonFXConfiguration, configs::TalonFXConfiguration, configs::CANcoderConfiguration>& constants)
     // Create drive and turn sim models
-    : driveSim_(frc::LinearSystemId::DCMotorSystem(DRIVE_GEARBOX, constants.DriveInertia, constants.DriveMotorGearRatio), DRIVE_GEARBOX)
-    , turnSim_(frc::LinearSystemId::DCMotorSystem(TURN_GEARBOX, constants.SteerInertia, constants.SteerMotorGearRatio), TURN_GEARBOX) {
+    : driveSim_(wpi::math::Models::SingleJointedArmFromPhysicalConstants(DRIVE_GEARBOX, constants.DriveInertia, constants.DriveMotorGearRatio), DRIVE_GEARBOX)
+    , turnSim_(wpi::math::Models::SingleJointedArmFromPhysicalConstants(TURN_GEARBOX, constants.SteerInertia, constants.SteerMotorGearRatio), TURN_GEARBOX) {
     // Enable wrapping for turn PID
     turnController_.EnableContinuousInput(-std::numbers::pi, std::numbers::pi);
 }
@@ -36,8 +36,8 @@ void ModuleIOSim::UpdateInputs(ModuleIOInputs& inputs) {
     }
 
     // Update simulation state
-    driveSim_.SetInputVoltage(units::volt_t{std::clamp(driveAppliedVolts_, -12.0, 12.0)});
-    turnSim_.SetInputVoltage(units::volt_t{std::clamp(turnAppliedVolts_, -12.0, 12.0)});
+    driveSim_.SetInputVoltage(wpi::units::volt_t{std::clamp(driveAppliedVolts_, -12.0, 12.0)});
+    turnSim_.SetInputVoltage(wpi::units::volt_t{std::clamp(turnAppliedVolts_, -12.0, 12.0)});
     driveSim_.Update(20_ms);
     turnSim_.Update(20_ms);
 
@@ -51,15 +51,15 @@ void ModuleIOSim::UpdateInputs(ModuleIOInputs& inputs) {
     // Update turn inputs
     inputs.turnConnected = true;
     inputs.turnEncoderConnected = true;
-    inputs.turnAbsolutePosition = frc::Rotation2d{turnSim_.GetAngularPosition()};
-    inputs.turnPosition = frc::Rotation2d{turnSim_.GetAngularPosition()};
+    inputs.turnAbsolutePosition = wpi::math::Rotation2d{turnSim_.GetAngularPosition()};
+    inputs.turnPosition = wpi::math::Rotation2d{turnSim_.GetAngularPosition()};
     inputs.turnVelocityRadPerSec = turnSim_.GetAngularVelocity().value();
     inputs.turnAppliedVolts = turnAppliedVolts_;
     inputs.turnCurrentAmps = std::abs(turnSim_.GetCurrentDraw().value());
 
     // Update odometry inputs (50Hz because high-frequency odometry in sim doesn't
     // matter)
-    inputs.odometryTimestamps = {frc::Timer::GetFPGATimestamp().value()};
+    inputs.odometryTimestamps = {wpi::Timer::GetTimestamp().value()};
     inputs.odometryDrivePositionsRad = {inputs.drivePositionRad};
     inputs.odometryTurnPositions = {inputs.turnPosition};
 }
@@ -80,7 +80,7 @@ void ModuleIOSim::SetDriveVelocity(double velocityRadPerSec) {
     driveController_.SetSetpoint(velocityRadPerSec);
 }
 
-void ModuleIOSim::SetTurnPosition(const frc::Rotation2d& rotation) {
+void ModuleIOSim::SetTurnPosition(const wpi::math::Rotation2d& rotation) {
     turnClosedLoop_ = true;
     turnController_.SetSetpoint(rotation.Radians().value());
 }

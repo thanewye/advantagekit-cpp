@@ -9,7 +9,7 @@
 
 #include <vector>
 
-#include <frc/geometry/Rotation2d.h>
+#include <wpi/math/geometry/Rotation2d.hpp>
 
 struct ModuleIOInputs {
     bool driveConnected = false;
@@ -19,14 +19,14 @@ struct ModuleIOInputs {
     double driveCurrentAmps = 0.0;
 
     bool turnConnected = false;
-    frc::Rotation2d turnPosition{};
+    wpi::math::Rotation2d turnPosition{};
     double turnVelocityRadPerSec = 0.0;
     double turnAppliedVolts = 0.0;
     double turnCurrentAmps = 0.0;
 
     std::vector<double> odometryTimestamps{};
     std::vector<double> odometryDrivePositionsRad{};
-    std::vector<frc::Rotation2d> odometryTurnPositions{};
+    std::vector<wpi::math::Rotation2d> odometryTurnPositions{};
 };
 
 class ModuleIO {
@@ -46,5 +46,5 @@ public:
     virtual void SetDriveVelocity(double velocityRadPerSec) {}
 
     /** Run the turn motor to the specified rotation. */
-    virtual void SetTurnPosition(const frc::Rotation2d& rotation) {}
+    virtual void SetTurnPosition(const wpi::math::Rotation2d& rotation) {}
 };

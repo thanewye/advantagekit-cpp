@@ -11,10 +11,10 @@
 #include <string_view>
 #include <vector>
 
-#include <akit/networktables/LoggedDashboardChooser.h>
-#include <frc2/command/Command.h>
-#include <frc2/command/CommandPtr.h>
-#include <frc2/command/button/CommandXboxController.h>
+#include <akit/networktables/LoggedNetworkChooser.h>
+#include <wpi/commands2/Command.hpp>
+#include <wpi/commands2/CommandPtr.hpp>
+#include <wpi/commands2/button/CommandXboxController.hpp>
 
 #include "subsystems/drive/Drive.h"
 #include "subsystems/superstructure/Superstructure.h"
@@ -35,23 +35,23 @@ public:
      *
      * @return the command to run in autonomous
      */
-    frc2::Command* GetAutonomousCommand();
+    wpi::cmd::Command* GetAutonomousCommand();
 
 private:
     /** Use this method to define your button->command mappings. */
     void ConfigureButtonBindings();
 
     /** Adds a command to the auto chooser and keeps it alive for the life of the container. */
-    void AddAutoOption(std::string_view name, frc2::CommandPtr command, bool isDefault = false);
+    void AddAutoOption(std::string_view name, wpi::cmd::CommandPtr command, bool isDefault = false);
 
     // Subsystems
     std::unique_ptr<Drive> drive_;
     std::unique_ptr<Superstructure> superstructure_;
 
     // Controller
-    frc2::CommandXboxController controller_{0};
+    wpi::cmd::CommandXboxController controller_{0};
 
     // Dashboard inputs
-    akit::networktables::LoggedDashboardChooser<frc2::Command*> autoChooser_{"Auto Choices"};
-    std::vector<frc2::CommandPtr> autoOptions_;
+    akit::networktables::LoggedNetworkChooser<wpi::cmd::Command*> autoChooser_{"Auto Choices"};
+    std::vector<wpi::cmd::CommandPtr> autoOptions_;
 };

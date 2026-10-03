@@ -13,7 +13,8 @@
 
 using namespace VisionConstants;
 
-VisionIOPhotonVisionSim::VisionIOPhotonVisionSim(std::string_view name, const frc::Transform3d& robotToCamera, std::function<frc::Pose2d()> poseSupplier)
+VisionIOPhotonVisionSim::VisionIOPhotonVisionSim(std::string_view name, const wpi::math::Transform3d& robotToCamera,
+                                                 std::function<wpi::math::Pose2d()> poseSupplier)
     : VisionIOPhotonVision(name, robotToCamera)
     , poseSupplier_(std::move(poseSupplier)) {
     // Initialize vision sim

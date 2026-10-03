@@ -10,10 +10,10 @@
 #include <algorithm>
 
 void SuperstructureIOSim::UpdateInputs(SuperstructureIOInputs& inputs) {
-    feederSim_.SetInputVoltage(units::volt_t{feederAppliedVolts_});
+    feederSim_.SetInputVoltage(wpi::units::volt_t{feederAppliedVolts_});
     feederSim_.Update(20_ms);
 
-    intakeLauncherSim_.SetInputVoltage(units::volt_t{intakeLauncherAppliedVolts_});
+    intakeLauncherSim_.SetInputVoltage(wpi::units::volt_t{intakeLauncherAppliedVolts_});
     intakeLauncherSim_.Update(20_ms);
 
     inputs.feederPositionRad = feederSim_.GetAngularPosition().value();

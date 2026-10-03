@@ -10,26 +10,24 @@
 #include <memory>
 #include <vector>
 
-#include <frc/Alert.h>
-#include <frc/geometry/Rotation2d.h>
-#include <frc/kinematics/SwerveModulePosition.h>
-#include <frc/kinematics/SwerveModuleState.h>
+#include <wpi/math/geometry/Rotation2d.hpp>
+#include <wpi/math/kinematics/SwerveModulePosition.hpp>
+#include <wpi/math/kinematics/SwerveModuleVelocity.hpp>
+#include <wpi/util/Alert.hpp>
 
 #include "generated/TunerConstants.h"
-
 #include "subsystems/drive/ModuleIO.h"
 
 class Module {
 public:
-    using ModuleConstants =
-        swerve::SwerveModuleConstants<configs::TalonFXConfiguration, configs::TalonFXConfiguration, configs::CANcoderConfiguration>;
+    using ModuleConstants = swerve::SwerveModuleConstants<configs::TalonFXConfiguration, configs::TalonFXConfiguration, configs::CANcoderConfiguration>;
 
     Module(std::unique_ptr<ModuleIO> io, int index, const ModuleConstants& constants);
 
     void Periodic();
 
     /** Runs the module with the specified setpoint state. Mutates the state to optimize it. */
-    void RunSetpoint(frc::SwerveModuleState& state);
+    void RunSetpoint(wpi::math::SwerveModuleVelocity& state);
 
     /** Runs the module with the specified output while controlling to zero degrees. */
     void RunCharacterization(double output);
@@ -38,7 +36,7 @@ public:
     void Stop();
 
     /** Returns the current turn angle of the module. */
-    frc::Rotation2d GetAngle() const;
+    wpi::math::Rotation2d GetAngle() const;
 
     /** Returns the current drive position of the module in meters. */
     double GetPositionMeters() const;
@@ -47,13 +45,13 @@ public:
     double GetVelocityMetersPerSec() const;
 
     /** Returns the module position (turn angle and drive position). */
-    frc::SwerveModulePosition GetPosition() const;
+    wpi::math::SwerveModulePosition GetPosition() const;
 
     /** Returns the module state (turn angle and drive velocity). */
-    frc::SwerveModuleState GetState() const;
+    wpi::math::SwerveModuleVelocity GetState() const;
 
     /** Returns the module positions received this cycle. */
-    const std::vector<frc::SwerveModulePosition>& GetOdometryPositions() const;
+    const std::vector<wpi::math::SwerveModulePosition>& GetOdometryPositions() const;
 
     /** Returns the timestamps of the samples received this cycle. */
     const std::vector<double>& GetOdometryTimestamps() const;
@@ -70,8 +68,8 @@ private:
     int index_;
     ModuleConstants constants_;
 
-    frc::Alert driveDisconnectedAlert_;
-    frc::Alert turnDisconnectedAlert_;
-    frc::Alert turnEncoderDisconnectedAlert_;
-    std::vector<frc::SwerveModulePosition> odometryPositions_;
+    wpi::util::Alert driveDisconnectedAlert_;
+    wpi::util::Alert turnDisconnectedAlert_;
+    wpi::util::Alert turnEncoderDisconnectedAlert_;
+    std::vector<wpi::math::SwerveModulePosition> odometryPositions_;
 };

@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include <frc/controller/PIDController.h>
-#include <frc/simulation/DifferentialDrivetrainSim.h>
+#include <wpi/math/controller/PIDController.hpp>
+#include <wpi/simulation/DifferentialDrivetrainSim.hpp>
 
 #include "subsystems/drive/DriveConstants.h"
 #include "subsystems/drive/DriveIO.h"
@@ -20,15 +20,15 @@ public:
     void SetVelocity(double leftRadPerSec, double rightRadPerSec, double leftFFVolts, double rightFFVolts) override;
 
 private:
-    frc::sim::DifferentialDrivetrainSim sim_ = frc::sim::DifferentialDrivetrainSim::CreateKitbotSim(
-        frc::sim::DifferentialDrivetrainSim::KitbotMotor::DualCIMPerSide, frc::sim::DifferentialDrivetrainSim::KitbotGearing::k10p71,
-        frc::sim::DifferentialDrivetrainSim::KitbotWheelSize::kSixInch);
+    wpi::sim::DifferentialDrivetrainSim sim_ = wpi::sim::DifferentialDrivetrainSim::CreateKitbotSim(
+        wpi::sim::DifferentialDrivetrainSim::KitbotMotor::DUAL_CIM_PER_SIDE, wpi::sim::DifferentialDrivetrainSim::KitbotGearing::RATIO_10P71,
+        wpi::sim::DifferentialDrivetrainSim::KitbotWheelSize::SIX_INCH);
 
     double leftAppliedVolts_ = 0.0;
     double rightAppliedVolts_ = 0.0;
     bool closedLoop_ = false;
-    frc::PIDController leftPID_{DriveConstants::simKp, 0.0, DriveConstants::simKd};
-    frc::PIDController rightPID_{DriveConstants::simKp, 0.0, DriveConstants::simKd};
+    wpi::math::PIDController leftPID_{DriveConstants::simKp, 0.0, DriveConstants::simKd};
+    wpi::math::PIDController rightPID_{DriveConstants::simKp, 0.0, DriveConstants::simKd};
     double leftFFVolts_ = 0.0;
     double rightFFVolts_ = 0.0;
 };

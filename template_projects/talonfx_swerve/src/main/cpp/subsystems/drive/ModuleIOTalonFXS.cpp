@@ -10,7 +10,7 @@
 #include <stdexcept>
 
 #include <ctre/phoenix6/configs/Configuration.hpp>
-#include <units/frequency.h>
+#include <wpi/units/frequency.hpp>
 
 #include "subsystems/drive/Drive.h"
 #include "subsystems/drive/PhoenixOdometryThread.h"
@@ -25,15 +25,15 @@ ModuleIOTalonFXS::ModuleIOTalonFXS(const ModuleConstants& constants)
     // Configure drive motor
     auto driveConfig = constants.DriveMotorInitialConfigs;
     switch (constants.DriveMotorType) {
-        case swerve::DriveMotorArrangement::TalonFXS_NEO_JST:
-            driveConfig.Commutation.MotorArrangement = signals::MotorArrangementValue::NEO_JST;
-            break;
-        case swerve::DriveMotorArrangement::TalonFXS_VORTEX_JST:
-            driveConfig.Commutation.MotorArrangement = signals::MotorArrangementValue::VORTEX_JST;
-            break;
-        default:
-            driveConfig.Commutation.MotorArrangement = signals::MotorArrangementValue::Disabled;
-            break;
+    case swerve::DriveMotorArrangement::TalonFXS_NEO_JST:
+        driveConfig.Commutation.MotorArrangement = signals::MotorArrangementValue::NEO_JST;
+        break;
+    case swerve::DriveMotorArrangement::TalonFXS_VORTEX_JST:
+        driveConfig.Commutation.MotorArrangement = signals::MotorArrangementValue::VORTEX_JST;
+        break;
+    default:
+        driveConfig.Commutation.MotorArrangement = signals::MotorArrangementValue::Disabled;
+        break;
     }
     driveConfig.MotorOutput.NeutralMode = signals::NeutralModeValue::Brake;
     driveConfig.Slot0 = constants.DriveMotorGains;
@@ -48,59 +48,59 @@ ModuleIOTalonFXS::ModuleIOTalonFXS(const ModuleConstants& constants)
     // Configure turn motor
     configs::TalonFXSConfiguration turnConfig;
     switch (constants.SteerMotorType) {
-        case swerve::SteerMotorArrangement::TalonFXS_Minion_JST:
-            turnConfig.Commutation.MotorArrangement = signals::MotorArrangementValue::Minion_JST;
-            break;
-        case swerve::SteerMotorArrangement::TalonFXS_NEO_JST:
-            turnConfig.Commutation.MotorArrangement = signals::MotorArrangementValue::NEO_JST;
-            break;
-        case swerve::SteerMotorArrangement::TalonFXS_VORTEX_JST:
-            turnConfig.Commutation.MotorArrangement = signals::MotorArrangementValue::VORTEX_JST;
-            break;
-        case swerve::SteerMotorArrangement::TalonFXS_NEO550_JST:
-            turnConfig.Commutation.MotorArrangement = signals::MotorArrangementValue::NEO550_JST;
-            break;
-        case swerve::SteerMotorArrangement::TalonFXS_Brushed_AB:
-        case swerve::SteerMotorArrangement::TalonFXS_Brushed_AC:
-        case swerve::SteerMotorArrangement::TalonFXS_Brushed_BC:
-            turnConfig.Commutation.MotorArrangement = signals::MotorArrangementValue::Brushed_DC;
-            break;
-        default:
-            turnConfig.Commutation.MotorArrangement = signals::MotorArrangementValue::Disabled;
-            break;
+    case swerve::SteerMotorArrangement::TalonFXS_Minion_JST:
+        turnConfig.Commutation.MotorArrangement = signals::MotorArrangementValue::Minion_JST;
+        break;
+    case swerve::SteerMotorArrangement::TalonFXS_NEO_JST:
+        turnConfig.Commutation.MotorArrangement = signals::MotorArrangementValue::NEO_JST;
+        break;
+    case swerve::SteerMotorArrangement::TalonFXS_VORTEX_JST:
+        turnConfig.Commutation.MotorArrangement = signals::MotorArrangementValue::VORTEX_JST;
+        break;
+    case swerve::SteerMotorArrangement::TalonFXS_NEO550_JST:
+        turnConfig.Commutation.MotorArrangement = signals::MotorArrangementValue::NEO550_JST;
+        break;
+    case swerve::SteerMotorArrangement::TalonFXS_Brushed_AB:
+    case swerve::SteerMotorArrangement::TalonFXS_Brushed_AC:
+    case swerve::SteerMotorArrangement::TalonFXS_Brushed_BC:
+        turnConfig.Commutation.MotorArrangement = signals::MotorArrangementValue::Brushed_DC;
+        break;
+    default:
+        turnConfig.Commutation.MotorArrangement = signals::MotorArrangementValue::Disabled;
+        break;
     }
     switch (constants.SteerMotorType) {
-        case swerve::SteerMotorArrangement::TalonFXS_Brushed_AC:
-            turnConfig.Commutation.BrushedMotorWiring = signals::BrushedMotorWiringValue::Leads_A_and_C;
-            break;
-        case swerve::SteerMotorArrangement::TalonFXS_Brushed_BC:
-            turnConfig.Commutation.BrushedMotorWiring = signals::BrushedMotorWiringValue::Leads_B_and_C;
-            break;
-        default:
-            turnConfig.Commutation.BrushedMotorWiring = signals::BrushedMotorWiringValue::Leads_A_and_B;
-            break;
+    case swerve::SteerMotorArrangement::TalonFXS_Brushed_AC:
+        turnConfig.Commutation.BrushedMotorWiring = signals::BrushedMotorWiringValue::Leads_A_and_C;
+        break;
+    case swerve::SteerMotorArrangement::TalonFXS_Brushed_BC:
+        turnConfig.Commutation.BrushedMotorWiring = signals::BrushedMotorWiringValue::Leads_B_and_C;
+        break;
+    default:
+        turnConfig.Commutation.BrushedMotorWiring = signals::BrushedMotorWiringValue::Leads_A_and_B;
+        break;
     }
     turnConfig.MotorOutput.NeutralMode = signals::NeutralModeValue::Brake;
     turnConfig.Slot0 = constants.SteerMotorGains;
     turnConfig.ExternalFeedback.FeedbackRemoteSensorID = constants.EncoderId;
     switch (constants.FeedbackSource) {
-        case swerve::SteerFeedbackType::RemoteCANdiPWM1:
-            turnConfig.ExternalFeedback.ExternalFeedbackSensorSource = signals::ExternalFeedbackSensorSourceValue::RemoteCANdiPWM1;
-            break;
-        case swerve::SteerFeedbackType::FusedCANdiPWM1:
-            turnConfig.ExternalFeedback.ExternalFeedbackSensorSource = signals::ExternalFeedbackSensorSourceValue::FusedCANdiPWM1;
-            break;
-        case swerve::SteerFeedbackType::SyncCANdiPWM1:
-            turnConfig.ExternalFeedback.ExternalFeedbackSensorSource = signals::ExternalFeedbackSensorSourceValue::SyncCANdiPWM1;
-            break;
-        default:
-            throw std::runtime_error(
-                "You have selected a turn feedback source that is not supported by the default implementation of ModuleIOTalonFXS (CANdi PWM 1). "
-                "Please check the AdvantageKit documentation for more information on alternative configurations: "
-                "https://docs.advantagekit.org/getting-started/template-projects/talonfx-swerve-template#custom-module-implementations");
+    case swerve::SteerFeedbackType::RemoteCANdiPWM1:
+        turnConfig.ExternalFeedback.ExternalFeedbackSensorSource = signals::ExternalFeedbackSensorSourceValue::RemoteCANdiPWM1;
+        break;
+    case swerve::SteerFeedbackType::FusedCANdiPWM1:
+        turnConfig.ExternalFeedback.ExternalFeedbackSensorSource = signals::ExternalFeedbackSensorSourceValue::FusedCANdiPWM1;
+        break;
+    case swerve::SteerFeedbackType::SyncCANdiPWM1:
+        turnConfig.ExternalFeedback.ExternalFeedbackSensorSource = signals::ExternalFeedbackSensorSourceValue::SyncCANdiPWM1;
+        break;
+    default:
+        throw std::runtime_error(
+            "You have selected a turn feedback source that is not supported by the default implementation of ModuleIOTalonFXS (CANdi PWM 1). "
+            "Please check the AdvantageKit documentation for more information on alternative configurations: "
+            "https://docs.advantagekit.org/getting-started/template-projects/talonfx-swerve-template#custom-module-implementations");
     }
     turnConfig.ExternalFeedback.RotorToSensorRatio = constants.SteerMotorGearRatio;
-    turnConfig.MotionMagic.MotionMagicCruiseVelocity = units::turns_per_second_t{100.0 / constants.SteerMotorGearRatio};
+    turnConfig.MotionMagic.MotionMagicCruiseVelocity = wpi::units::turns_per_second_t{100.0 / constants.SteerMotorGearRatio};
     turnConfig.MotionMagic.MotionMagicAcceleration = turnConfig.MotionMagic.MotionMagicCruiseVelocity / 0.100_s;
     turnConfig.MotionMagic.MotionMagicExpo_kV = ctre::unit::volts_per_turn_per_second_t{0.12 * constants.SteerMotorGearRatio};
     turnConfig.MotionMagic.MotionMagicExpo_kA = ctre::unit::volts_per_turn_per_second_squared_t{0.1};
@@ -123,7 +123,7 @@ ModuleIOTalonFXS::ModuleIOTalonFXS(const ModuleConstants& constants)
     turnPositionQueue_ = PhoenixOdometryThread::GetInstance().RegisterSignal(turnPosition_);
 
     // Configure periodic frames
-    BaseStatusSignal::SetUpdateFrequencyForAll(units::hertz_t{Drive::GetOdometryFrequency()}, drivePosition_, turnPosition_);
+    BaseStatusSignal::SetUpdateFrequencyForAll(wpi::units::hertz_t{Drive::GetOdometryFrequency()}, drivePosition_, turnPosition_);
     BaseStatusSignal::SetUpdateFrequencyForAll(50_Hz, driveVelocity_, driveAppliedVolts_, driveCurrent_, turnAbsolutePosition_, turnVelocity_,
                                                turnAppliedVolts_, turnCurrent_);
     hardware::ParentDevice::OptimizeBusUtilizationForAll(driveTalon_, turnTalon_);
@@ -137,17 +137,17 @@ void ModuleIOTalonFXS::UpdateInputs(ModuleIOInputs& inputs) {
 
     // Update drive inputs
     inputs.driveConnected = driveConnectedDebounce_.Calculate(driveStatus.IsOK());
-    inputs.drivePositionRad = units::radian_t{drivePosition_.GetValue()}.value();
-    inputs.driveVelocityRadPerSec = units::radians_per_second_t{driveVelocity_.GetValue()}.value();
+    inputs.drivePositionRad = wpi::units::radian_t{drivePosition_.GetValue()}.value();
+    inputs.driveVelocityRadPerSec = wpi::units::radians_per_second_t{driveVelocity_.GetValue()}.value();
     inputs.driveAppliedVolts = driveAppliedVolts_.GetValue().value();
     inputs.driveCurrentAmps = driveCurrent_.GetValue().value();
 
     // Update turn inputs
     inputs.turnConnected = turnConnectedDebounce_.Calculate(turnStatus.IsOK());
     inputs.turnEncoderConnected = turnEncoderConnectedDebounce_.Calculate(turnEncoderStatus.IsOK());
-    inputs.turnAbsolutePosition = frc::Rotation2d{turnAbsolutePosition_.GetValue()};
-    inputs.turnPosition = frc::Rotation2d{turnPosition_.GetValue()};
-    inputs.turnVelocityRadPerSec = units::radians_per_second_t{turnVelocity_.GetValue()}.value();
+    inputs.turnAbsolutePosition = wpi::math::Rotation2d{turnAbsolutePosition_.GetValue()};
+    inputs.turnPosition = wpi::math::Rotation2d{turnPosition_.GetValue()};
+    inputs.turnVelocityRadPerSec = wpi::units::radians_per_second_t{turnVelocity_.GetValue()}.value();
     inputs.turnAppliedVolts = turnAppliedVolts_.GetValue().value();
     inputs.turnCurrentAmps = turnCurrent_.GetValue().value();
 
@@ -155,27 +155,27 @@ void ModuleIOTalonFXS::UpdateInputs(ModuleIOInputs& inputs) {
     inputs.odometryTimestamps = timestampQueue_->Drain();
     inputs.odometryDrivePositionsRad.clear();
     for (double value : drivePositionQueue_->Drain()) {
-        inputs.odometryDrivePositionsRad.push_back(units::radian_t{units::turn_t{value}}.value());
+        inputs.odometryDrivePositionsRad.push_back(wpi::units::radian_t{wpi::units::turn_t{value}}.value());
     }
     inputs.odometryTurnPositions.clear();
     for (double value : turnPositionQueue_->Drain()) {
-        inputs.odometryTurnPositions.push_back(frc::Rotation2d{units::turn_t{value}});
+        inputs.odometryTurnPositions.push_back(wpi::math::Rotation2d{wpi::units::turn_t{value}});
     }
 }
 
 void ModuleIOTalonFXS::SetDriveOpenLoop(double output) {
-    driveTalon_.SetControl(voltageRequest_.WithOutput(units::volt_t{output}));
+    driveTalon_.SetControl(voltageRequest_.WithOutput(wpi::units::volt_t{output}));
 }
 
 void ModuleIOTalonFXS::SetTurnOpenLoop(double output) {
-    turnTalon_.SetControl(voltageRequest_.WithOutput(units::volt_t{output}));
+    turnTalon_.SetControl(voltageRequest_.WithOutput(wpi::units::volt_t{output}));
 }
 
 void ModuleIOTalonFXS::SetDriveVelocity(double velocityRadPerSec) {
-    units::turns_per_second_t velocityRotPerSec{units::radians_per_second_t{velocityRadPerSec}};
+    wpi::units::turns_per_second_t velocityRotPerSec{wpi::units::radians_per_second_t{velocityRadPerSec}};
     driveTalon_.SetControl(velocityVoltageRequest_.WithVelocity(velocityRotPerSec));
 }
 
-void ModuleIOTalonFXS::SetTurnPosition(const frc::Rotation2d& rotation) {
+void ModuleIOTalonFXS::SetTurnPosition(const wpi::math::Rotation2d& rotation) {
     turnTalon_.SetControl(positionVoltageRequest_.WithPosition(rotation.Radians()));
 }

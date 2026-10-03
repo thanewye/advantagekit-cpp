@@ -18,7 +18,7 @@ void DriveIOSim::UpdateInputs(DriveIOInputs& inputs) {
     }
 
     // Update simulation state
-    sim_.SetInputs(units::volt_t{std::clamp(leftAppliedVolts_, -12.0, 12.0)}, units::volt_t{std::clamp(rightAppliedVolts_, -12.0, 12.0)});
+    sim_.SetInputs(wpi::units::volt_t{std::clamp(leftAppliedVolts_, -12.0, 12.0)}, wpi::units::volt_t{std::clamp(rightAppliedVolts_, -12.0, 12.0)});
     sim_.Update(20_ms);
 
     inputs.leftPositionRad = sim_.GetLeftPosition().value() / wheelRadiusMeters;

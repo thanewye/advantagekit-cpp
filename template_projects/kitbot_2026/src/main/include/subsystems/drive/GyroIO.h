@@ -7,11 +7,11 @@
 
 #pragma once
 
-#include <frc/geometry/Rotation2d.h>
+#include <wpi/math/geometry/Rotation2d.hpp>
 
 struct GyroIOInputs {
     bool connected = false;
-    frc::Rotation2d yawPosition{};
+    wpi::math::Rotation2d yawPosition{};
     double yawVelocityRadPerSec = 0.0;
 };
 

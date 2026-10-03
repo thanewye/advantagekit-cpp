@@ -8,7 +8,7 @@
 #include "subsystems/superstructure/Superstructure.h"
 
 #include <akit/Logger.h>
-#include <units/time.h>
+#include <wpi/units/time.hpp>
 
 #include "subsystems/superstructure/SuperstructureConstants.h"
 
@@ -22,7 +22,7 @@ void Superstructure::Periodic() {
     akit::Logger::ProcessInputs("Superstructure", inputs_);
 }
 
-frc2::CommandPtr Superstructure::Intake() {
+wpi::cmd::CommandPtr Superstructure::Intake() {
     return RunEnd(
         [this] {
             io_->SetFeederVoltage(intakingFeederVoltage);
@@ -34,7 +34,7 @@ frc2::CommandPtr Superstructure::Intake() {
         });
 }
 
-frc2::CommandPtr Superstructure::Eject() {
+wpi::cmd::CommandPtr Superstructure::Eject() {
     return RunEnd(
         [this] {
             io_->SetFeederVoltage(-intakingFeederVoltage);
@@ -46,12 +46,12 @@ frc2::CommandPtr Superstructure::Eject() {
         });
 }
 
-frc2::CommandPtr Superstructure::Launch() {
+wpi::cmd::CommandPtr Superstructure::Launch() {
     return Run([this] {
                io_->SetFeederVoltage(spinUpFeederVoltage);
                io_->SetIntakeLauncherVoltage(launchingLauncherVoltage);
            })
-        .WithTimeout(units::second_t{spinUpSeconds})
+        .WithTimeout(wpi::units::second_t{spinUpSeconds})
         .AndThen(Run([this] {
             io_->SetFeederVoltage(launchingFeederVoltage);
             io_->SetIntakeLauncherVoltage(launchingLauncherVoltage);

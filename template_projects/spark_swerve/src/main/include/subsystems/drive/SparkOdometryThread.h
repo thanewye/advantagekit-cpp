@@ -11,8 +11,8 @@
 #include <memory>
 #include <vector>
 
-#include <frc/Notifier.h>
 #include <rev/SparkBase.h>
+#include <wpi/system/Notifier.hpp>
 
 #include "subsystems/drive/OdometryQueue.h"
 
@@ -29,7 +29,7 @@ public:
     void Start();
 
     /** Registers a Spark signal to be read from the thread. */
-    std::shared_ptr<OdometryQueue> RegisterSignal(rev::spark::SparkBase& spark, std::function<double()> signal);
+    std::shared_ptr<OdometryQueue> RegisterSignal(std::function<rev::util::Signal<double>()> signal);
 
     /** Registers a generic signal to be read from the thread. */
     std::shared_ptr<OdometryQueue> RegisterSignal(std::function<double()> signal);
@@ -42,12 +42,11 @@ private:
 
     void Run();
 
-    std::vector<rev::spark::SparkBase*> sparks_;
-    std::vector<std::function<double()>> sparkSignals_;
+    std::vector<std::function<rev::util::Signal<double>()>> sparkSignals_;
     std::vector<std::function<double()>> genericSignals_;
     std::vector<std::shared_ptr<OdometryQueue>> sparkQueues_;
     std::vector<std::shared_ptr<OdometryQueue>> genericQueues_;
     std::vector<std::shared_ptr<OdometryQueue>> timestampQueues_;
 
-    frc::Notifier notifier_{[this] { Run(); }};
+    wpi::Notifier notifier_{[this] { Run(); }};
 };

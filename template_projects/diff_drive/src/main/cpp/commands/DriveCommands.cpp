@@ -11,25 +11,25 @@
 #include <memory>
 #include <vector>
 
-#include <frc/MathUtil.h>
-#include <frc/Timer.h>
-#include <frc/drive/DifferentialDrive.h>
-#include <frc2/command/Commands.h>
+#include <wpi/commands2/Commands.hpp>
+#include <wpi/drive/DifferentialDrive.hpp>
+#include <wpi/math/util/MathUtil.hpp>
+#include <wpi/system/Timer.hpp>
 
 namespace {
     constexpr double DEADBAND = 0.1;
     constexpr double FF_RAMP_RATE = 0.1; // Volts/Sec
 } // namespace
 
-frc2::CommandPtr DriveCommands::ArcadeDrive(Drive* drive, std::function<double()> xSupplier, std::function<double()> zSupplier) {
-    return frc2::cmd::Run(
+wpi::cmd::CommandPtr DriveCommands::ArcadeDrive(Drive* drive, std::function<double()> xSupplier, std::function<double()> zSupplier) {
+    return wpi::cmd::Run(
         [drive, xSupplier = std::move(xSupplier), zSupplier = std::move(zSupplier)] {
             // Apply deadband
-            double x = frc::ApplyDeadband(xSupplier(), DEADBAND);
-            double z = frc::ApplyDeadband(zSupplier(), DEADBAND);
+            double x = wpi::math::ApplyDeadband(xSupplier(), DEADBAND);
+            double z = wpi::math::ApplyDeadband(zSupplier(), DEADBAND);
 
             // Calculate speeds
-            auto speeds = frc::DifferentialDrive::ArcadeDriveIK(x, z, true);
+            auto speeds = wpi::DifferentialDrive::ArcadeDriveIK(x, z, true);
 
             // Apply output
             drive->RunClosedLoop(speeds.left * DriveConstants::maxSpeedMetersPerSec, speeds.right * DriveConstants::maxSpeedMetersPerSec);
@@ -37,21 +37,21 @@ frc2::CommandPtr DriveCommands::ArcadeDrive(Drive* drive, std::function<double()
         {drive});
 }
 
-frc2::CommandPtr DriveCommands::FeedforwardCharacterization(Drive* drive) {
+wpi::cmd::CommandPtr DriveCommands::FeedforwardCharacterization(Drive* drive) {
     auto velocitySamples = std::make_shared<std::vector<double>>();
     auto voltageSamples = std::make_shared<std::vector<double>>();
-    auto timer = std::make_shared<frc::Timer>();
+    auto timer = std::make_shared<wpi::Timer>();
 
-    return frc2::cmd::Sequence(
+    return wpi::cmd::Sequence(
         // Reset data
-        frc2::cmd::RunOnce([=] {
+        wpi::cmd::RunOnce([=] {
             velocitySamples->clear();
             voltageSamples->clear();
             timer->Restart();
         }),
 
         // Accelerate and gather data
-        frc2::cmd::Run(
+        wpi::cmd::Run(
             [=] {
                 double voltage = timer->Get().value() * FF_RAMP_RATE;
                 drive->RunOpenLoop(voltage, voltage);

@@ -11,10 +11,10 @@
 #include <memory>
 #include <string_view>
 
-#include <frc/geometry/Pose2d.h>
-#include <frc/geometry/Transform3d.h>
 #include <photon/simulation/PhotonCameraSim.h>
 #include <photon/simulation/VisionSystemSim.h>
+#include <wpi/math/geometry/Pose2d.hpp>
+#include <wpi/math/geometry/Transform3d.hpp>
 
 #include "subsystems/vision/VisionIOPhotonVision.h"
 
@@ -27,13 +27,13 @@ public:
      * @param name The name of the camera.
      * @param poseSupplier Supplier for the robot pose to use in simulation.
      */
-    VisionIOPhotonVisionSim(std::string_view name, const frc::Transform3d& robotToCamera, std::function<frc::Pose2d()> poseSupplier);
+    VisionIOPhotonVisionSim(std::string_view name, const wpi::math::Transform3d& robotToCamera, std::function<wpi::math::Pose2d()> poseSupplier);
 
     void UpdateInputs(VisionIOInputs& inputs) override;
 
 private:
     inline static std::unique_ptr<photon::VisionSystemSim> visionSim;
 
-    std::function<frc::Pose2d()> poseSupplier_;
+    std::function<wpi::math::Pose2d()> poseSupplier_;
     std::unique_ptr<photon::PhotonCameraSim> cameraSim_;
 };

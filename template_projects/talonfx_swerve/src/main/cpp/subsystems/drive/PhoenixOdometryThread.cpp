@@ -9,8 +9,8 @@
 
 #include <chrono>
 
-#include <frc/RobotController.h>
-#include <units/time.h>
+#include <wpi/system/RobotController.hpp>
+#include <wpi/units/time.hpp>
 
 #include "generated/TunerConstants.h"
 #include "subsystems/drive/Drive.h"
@@ -64,7 +64,7 @@ void PhoenixOdometryThread::Run() {
         {
             std::lock_guard lock{signalsLock_};
             if (isCANFD_ && !phoenixSignals_.empty()) {
-                ctre::phoenix6::BaseStatusSignal::WaitForAll(units::second_t{2.0 / Drive::GetOdometryFrequency()}, phoenixSignals_);
+                ctre::phoenix6::BaseStatusSignal::WaitForAll(wpi::units::second_t{2.0 / Drive::GetOdometryFrequency()}, phoenixSignals_);
             } else {
                 // "waitForAll" does not support blocking on multiple signals with a bus
                 // that is not CAN FD, regardless of Pro licensing. No reasoning for this
@@ -77,10 +77,10 @@ void PhoenixOdometryThread::Run() {
         // Save new data to queues
         std::lock_guard lock{Drive::odometryLock};
 
-        // Sample timestamp is current FPGA time minus average CAN latency
+        // Sample timestamp is current monotonic time minus average CAN latency
         // Default timestamps from Phoenix are NOT compatible with
         // FPGA timestamps, this solution is imperfect but close
-        double timestamp = frc::RobotController::GetFPGATime() / 1e6;
+        double timestamp = wpi::RobotController::GetMonotonicTime() / 1e9;
         double totalLatency = 0.0;
         for (const auto* signal : phoenixSignals_) {
             totalLatency += signal->GetTimestamp().GetLatency().value();

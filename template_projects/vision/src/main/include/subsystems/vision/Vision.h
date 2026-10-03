@@ -12,19 +12,19 @@
 #include <memory>
 #include <vector>
 
-#include <frc/Alert.h>
-#include <frc/geometry/Pose2d.h>
-#include <frc/geometry/Rotation2d.h>
-#include <frc2/command/SubsystemBase.h>
-#include <units/time.h>
-#include <wpi/array.h>
+#include <wpi/commands2/SubsystemBase.hpp>
+#include <wpi/math/geometry/Pose2d.hpp>
+#include <wpi/math/geometry/Rotation2d.hpp>
+#include <wpi/units/time.hpp>
+#include <wpi/util/Alert.hpp>
+#include <wpi/util/array.hpp>
 
 #include "subsystems/vision/VisionIO.h"
 
-class Vision : public frc2::SubsystemBase {
+class Vision : public wpi::cmd::SubsystemBase {
 public:
-    using VisionConsumer =
-        std::function<void(const frc::Pose2d& visionRobotPoseMeters, units::second_t timestampSeconds, const wpi::array<double, 3>& visionMeasurementStdDevs)>;
+    using VisionConsumer = std::function<void(const wpi::math::Pose2d& visionRobotPoseMeters, wpi::units::second_t timestampSeconds,
+                                              const wpi::util::array<double, 3>& visionMeasurementStdDevs)>;
 
     template<std::derived_from<VisionIO>... IO>
     explicit Vision(VisionConsumer consumer, std::unique_ptr<IO>... io)
@@ -36,8 +36,9 @@ public:
 
         // Initialize disconnected alerts
         for (size_t i = 0; i < io_.size(); i++) {
-            disconnectedAlerts_.push_back(
-                std::make_unique<frc::Alert>("Vision camera " + std::to_string(i) + " is disconnected.", frc::Alert::AlertType::kWarning));
+            disconnectedAlerts_.push_back(std::make_unique<wpi::util::Alert>("Vision/Camera" + std::to_string(i) + "/Disconnected",
+                                                                             "Vision camera " + std::to_string(i) + " is disconnected.",
+                                                                             wpi::util::Alert::Level::MEDIUM));
         }
     }
 
@@ -46,7 +47,7 @@ public:
      *
      * @param cameraIndex The index of the camera to use.
      */
-    frc::Rotation2d GetTargetX(size_t cameraIndex) const;
+    wpi::math::Rotation2d GetTargetX(size_t cameraIndex) const;
 
     void Periodic() override;
 
@@ -54,5 +55,5 @@ private:
     VisionConsumer consumer_;
     std::vector<std::unique_ptr<VisionIO>> io_;
     std::vector<VisionIOInputs> inputs_;
-    std::vector<std::unique_ptr<frc::Alert>> disconnectedAlerts_;
+    std::vector<std::unique_ptr<wpi::util::Alert>> disconnectedAlerts_;
 };

@@ -9,7 +9,7 @@
 
 #include <functional>
 
-#include <frc2/command/CommandPtr.h>
+#include <wpi/commands2/CommandPtr.hpp>
 
 #include "subsystems/drive/Drive.h"
 
@@ -18,8 +18,8 @@ namespace DriveCommands {
      * Standard joystick drive, where X is the forward-backward axis (positive = forward) and Z is the
      * left-right axis (positive = counter-clockwise).
      */
-    frc2::CommandPtr ArcadeDrive(Drive* drive, std::function<double()> xSupplier, std::function<double()> zSupplier);
+    wpi::cmd::CommandPtr ArcadeDrive(Drive* drive, std::function<double()> xSupplier, std::function<double()> zSupplier);
 
     /** Measures the velocity feedforward constants for the drive. */
-    frc2::CommandPtr FeedforwardCharacterization(Drive* drive);
+    wpi::cmd::CommandPtr FeedforwardCharacterization(Drive* drive);
 } // namespace DriveCommands

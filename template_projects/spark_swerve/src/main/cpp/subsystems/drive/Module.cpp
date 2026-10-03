@@ -18,8 +18,10 @@ using namespace DriveConstants;
 Module::Module(std::unique_ptr<ModuleIO> io, int index)
     : io_(std::move(io))
     , index_(index)
-    , driveDisconnectedAlert_("Disconnected drive motor on module " + std::to_string(index) + ".", frc::Alert::AlertType::kError)
-    , turnDisconnectedAlert_("Disconnected turn motor on module " + std::to_string(index) + ".", frc::Alert::AlertType::kError) {}
+    , driveDisconnectedAlert_("Drive/Module" + std::to_string(index) + "/DriveDisconnected",
+                              "Disconnected drive motor on module " + std::to_string(index) + ".", wpi::util::Alert::Level::HIGH)
+    , turnDisconnectedAlert_("Drive/Module" + std::to_string(index) + "/TurnDisconnected", "Disconnected turn motor on module " + std::to_string(index) + ".",
+                             wpi::util::Alert::Level::HIGH) {}
 
 void Module::Periodic() {
     io_->UpdateInputs(inputs_);
@@ -30,8 +32,8 @@ void Module::Periodic() {
     odometryPositions_.resize(sampleCount);
     for (size_t i = 0; i < sampleCount; i++) {
         double positionMeters = inputs_.odometryDrivePositionsRad[i] * wheelRadiusMeters;
-        frc::Rotation2d angle = inputs_.odometryTurnPositions[i];
-        odometryPositions_[i] = frc::SwerveModulePosition{units::meter_t{positionMeters}, angle};
+        wpi::math::Rotation2d angle = inputs_.odometryTurnPositions[i];
+        odometryPositions_[i] = wpi::math::SwerveModulePosition{wpi::units::meter_t{positionMeters}, angle};
     }
 
     // Update alerts
@@ -39,19 +41,19 @@ void Module::Periodic() {
     turnDisconnectedAlert_.Set(!inputs_.turnConnected);
 }
 
-void Module::RunSetpoint(frc::SwerveModuleState& state) {
+void Module::RunSetpoint(wpi::math::SwerveModuleVelocity& state) {
     // Optimize velocity setpoint
-    state.Optimize(GetAngle());
-    state.CosineScale(inputs_.turnPosition);
+    state = state.Optimize(GetAngle());
+    state = state.CosineScale(inputs_.turnPosition);
 
     // Apply setpoints
-    io_->SetDriveVelocity(state.speed.value() / wheelRadiusMeters);
+    io_->SetDriveVelocity(state.velocity.value() / wheelRadiusMeters);
     io_->SetTurnPosition(state.angle);
 }
 
 void Module::RunCharacterization(double output) {
     io_->SetDriveOpenLoop(output);
-    io_->SetTurnPosition(frc::Rotation2d{});
+    io_->SetTurnPosition(wpi::math::Rotation2d{});
 }
 
 void Module::Stop() {
@@ -59,7 +61,7 @@ void Module::Stop() {
     io_->SetTurnOpenLoop(0.0);
 }
 
-frc::Rotation2d Module::GetAngle() const {
+wpi::math::Rotation2d Module::GetAngle() const {
     return inputs_.turnPosition;
 }
 
@@ -71,15 +73,15 @@ double Module::GetVelocityMetersPerSec() const {
     return inputs_.driveVelocityRadPerSec * wheelRadiusMeters;
 }
 
-frc::SwerveModulePosition Module::GetPosition() const {
-    return {units::meter_t{GetPositionMeters()}, GetAngle()};
+wpi::math::SwerveModulePosition Module::GetPosition() const {
+    return {wpi::units::meter_t{GetPositionMeters()}, GetAngle()};
 }
 
-frc::SwerveModuleState Module::GetState() const {
-    return {units::meters_per_second_t{GetVelocityMetersPerSec()}, GetAngle()};
+wpi::math::SwerveModuleVelocity Module::GetState() const {
+    return {wpi::units::meters_per_second_t{GetVelocityMetersPerSec()}, GetAngle()};
 }
 
-const std::vector<frc::SwerveModulePosition>& Module::GetOdometryPositions() const {
+const std::vector<wpi::math::SwerveModulePosition>& Module::GetOdometryPositions() const {
     return odometryPositions_;
 }
 

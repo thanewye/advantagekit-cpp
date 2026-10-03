@@ -12,14 +12,14 @@
 #include <numbers>
 #include <string>
 
-#include <frc/apriltag/AprilTagFieldLayout.h>
-#include <frc/apriltag/AprilTagFields.h>
-#include <frc/geometry/Rotation3d.h>
-#include <frc/geometry/Transform3d.h>
+#include <wpi/fields/Field.hpp>
+#include <wpi/fields/fields.hpp>
+#include <wpi/math/geometry/Rotation3d.hpp>
+#include <wpi/math/geometry/Transform3d.hpp>
 
 namespace VisionConstants {
     // AprilTag layout
-    inline const frc::AprilTagFieldLayout aprilTagLayout = frc::AprilTagFieldLayout::LoadField(frc::AprilTagField::kDefaultField);
+    inline const wpi::fields::Field aprilTagLayout = wpi::fields::GetField(wpi::fields::FieldId::DEFAULT_FIELD);
 
     // Camera names, must match names configured on coprocessor
     inline const std::string camera0Name = "camera_0";
@@ -27,8 +27,8 @@ namespace VisionConstants {
 
     // Robot to camera transforms
     // (Not used by Limelight, configure in web UI instead)
-    inline const frc::Transform3d robotToCamera0{0.2_m, 0.0_m, 0.2_m, frc::Rotation3d{0.0_rad, -0.4_rad, 0.0_rad}};
-    inline const frc::Transform3d robotToCamera1{-0.2_m, 0.0_m, 0.2_m, frc::Rotation3d{0.0_rad, -0.4_rad, units::radian_t{std::numbers::pi}}};
+    inline const wpi::math::Transform3d robotToCamera0{0.2_m, 0.0_m, 0.2_m, wpi::math::Rotation3d{0.0_rad, -0.4_rad, 0.0_rad}};
+    inline const wpi::math::Transform3d robotToCamera1{-0.2_m, 0.0_m, 0.2_m, wpi::math::Rotation3d{0.0_rad, -0.4_rad, wpi::units::radian_t{std::numbers::pi}}};
 
     // Basic filtering thresholds
     inline double maxAmbiguity = 0.3;
@@ -47,6 +47,6 @@ namespace VisionConstants {
     };
 
     // Multipliers to apply for MegaTag 2 observations
-    inline double linearStdDevMegatag2Factor = 0.5;                                     // More stable than full 3D solve
+    inline double linearStdDevMegatag2Factor = 0.5;                                      // More stable than full 3D solve
     inline double angularStdDevMegatag2Factor = std::numeric_limits<double>::infinity(); // No rotation data available
 } // namespace VisionConstants

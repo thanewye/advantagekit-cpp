@@ -8,7 +8,7 @@
 #include "util/LocalADStarAK.h"
 
 #include <akit/Logger.h>
-#include <units/length.h>
+#include <wpi/units/length.hpp>
 
 bool LocalADStarAK::isNewPathAvailable() {
     if (!akit::Logger::HasReplaySource()) {
@@ -20,8 +20,7 @@ bool LocalADStarAK::isNewPathAvailable() {
     return io_.isNewPathAvailable;
 }
 
-std::shared_ptr<pathplanner::PathPlannerPath> LocalADStarAK::getCurrentPath(pathplanner::PathConstraints constraints,
-                                                                             pathplanner::GoalEndState goalEndState) {
+std::shared_ptr<pathplanner::PathPlannerPath> LocalADStarAK::getCurrentPath(pathplanner::PathConstraints constraints, pathplanner::GoalEndState goalEndState) {
     if (!akit::Logger::HasReplaySource()) {
         io_.UpdateCurrentPathPoints(constraints, goalEndState);
     }
@@ -35,20 +34,20 @@ std::shared_ptr<pathplanner::PathPlannerPath> LocalADStarAK::getCurrentPath(path
     return pathplanner::PathPlannerPath::fromPathPoints(io_.currentPathPoints, constraints, goalEndState);
 }
 
-void LocalADStarAK::setStartPosition(const frc::Translation2d& startPosition) {
+void LocalADStarAK::setStartPosition(const wpi::math::Translation2d& startPosition) {
     if (!akit::Logger::HasReplaySource()) {
         io_.adStar.setStartPosition(startPosition);
     }
 }
 
-void LocalADStarAK::setGoalPosition(const frc::Translation2d& goalPosition) {
+void LocalADStarAK::setGoalPosition(const wpi::math::Translation2d& goalPosition) {
     if (!akit::Logger::HasReplaySource()) {
         io_.adStar.setGoalPosition(goalPosition);
     }
 }
 
-void LocalADStarAK::setDynamicObstacles(const std::vector<std::pair<frc::Translation2d, frc::Translation2d>>& obs,
-                                        const frc::Translation2d& currentRobotPos) {
+void LocalADStarAK::setDynamicObstacles(const std::vector<std::pair<wpi::math::Translation2d, wpi::math::Translation2d>>& obs,
+                                        const wpi::math::Translation2d& currentRobotPos) {
     if (!akit::Logger::HasReplaySource()) {
         io_.adStar.setDynamicObstacles(obs, currentRobotPos);
     }
@@ -74,7 +73,7 @@ void LocalADStarAK::ADStarIO::FromLog(const akit::LogTable& table) {
 
     std::vector<pathplanner::PathPoint> pathPoints;
     for (size_t i = 0; i + 1 < pointsLogged.size(); i += 2) {
-        pathPoints.emplace_back(frc::Translation2d{units::meter_t{pointsLogged[i]}, units::meter_t{pointsLogged[i + 1]}});
+        pathPoints.emplace_back(wpi::math::Translation2d{wpi::units::meter_t{pointsLogged[i]}, wpi::units::meter_t{pointsLogged[i + 1]}});
     }
 
     currentPathPoints = pathPoints;
@@ -84,8 +83,7 @@ void LocalADStarAK::ADStarIO::UpdateIsNewPathAvailable() {
     isNewPathAvailable = adStar.isNewPathAvailable();
 }
 
-void LocalADStarAK::ADStarIO::UpdateCurrentPathPoints(const pathplanner::PathConstraints& constraints,
-                                                      const pathplanner::GoalEndState& goalEndState) {
+void LocalADStarAK::ADStarIO::UpdateCurrentPathPoints(const pathplanner::PathConstraints& constraints, const pathplanner::GoalEndState& goalEndState) {
     auto currentPath = adStar.getCurrentPath(constraints, goalEndState);
 
     if (currentPath) {

@@ -10,7 +10,7 @@
 #include <stdexcept>
 
 #include <ctre/phoenix6/configs/Configuration.hpp>
-#include <units/frequency.h>
+#include <wpi/units/frequency.hpp>
 
 #include "subsystems/drive/Drive.h"
 #include "subsystems/drive/PhoenixOdometryThread.h"
@@ -43,23 +43,23 @@ ModuleIOTalonFX::ModuleIOTalonFX(const ModuleConstants& constants)
     turnConfig.Slot0 = constants.SteerMotorGains;
     turnConfig.Feedback.FeedbackRemoteSensorID = constants.EncoderId;
     switch (constants.FeedbackSource) {
-        case swerve::SteerFeedbackType::RemoteCANcoder:
-            turnConfig.Feedback.FeedbackSensorSource = signals::FeedbackSensorSourceValue::RemoteCANcoder;
-            break;
-        case swerve::SteerFeedbackType::FusedCANcoder:
-            turnConfig.Feedback.FeedbackSensorSource = signals::FeedbackSensorSourceValue::FusedCANcoder;
-            break;
-        case swerve::SteerFeedbackType::SyncCANcoder:
-            turnConfig.Feedback.FeedbackSensorSource = signals::FeedbackSensorSourceValue::SyncCANcoder;
-            break;
-        default:
-            throw std::runtime_error(
-                "You have selected a turn feedback source that is not supported by the default implementation of ModuleIOTalonFX. Please check the "
-                "AdvantageKit documentation for more information on alternative configurations: "
-                "https://docs.advantagekit.org/getting-started/template-projects/talonfx-swerve-template#custom-module-implementations");
+    case swerve::SteerFeedbackType::RemoteCANcoder:
+        turnConfig.Feedback.FeedbackSensorSource = signals::FeedbackSensorSourceValue::RemoteCANcoder;
+        break;
+    case swerve::SteerFeedbackType::FusedCANcoder:
+        turnConfig.Feedback.FeedbackSensorSource = signals::FeedbackSensorSourceValue::FusedCANcoder;
+        break;
+    case swerve::SteerFeedbackType::SyncCANcoder:
+        turnConfig.Feedback.FeedbackSensorSource = signals::FeedbackSensorSourceValue::SyncCANcoder;
+        break;
+    default:
+        throw std::runtime_error(
+            "You have selected a turn feedback source that is not supported by the default implementation of ModuleIOTalonFX. Please check the "
+            "AdvantageKit documentation for more information on alternative configurations: "
+            "https://docs.advantagekit.org/getting-started/template-projects/talonfx-swerve-template#custom-module-implementations");
     }
     turnConfig.Feedback.RotorToSensorRatio = constants.SteerMotorGearRatio;
-    turnConfig.MotionMagic.MotionMagicCruiseVelocity = units::turns_per_second_t{100.0 / constants.SteerMotorGearRatio};
+    turnConfig.MotionMagic.MotionMagicCruiseVelocity = wpi::units::turns_per_second_t{100.0 / constants.SteerMotorGearRatio};
     turnConfig.MotionMagic.MotionMagicAcceleration = turnConfig.MotionMagic.MotionMagicCruiseVelocity / 0.100_s;
     turnConfig.MotionMagic.MotionMagicExpo_kV = ctre::unit::volts_per_turn_per_second_t{0.12 * constants.SteerMotorGearRatio};
     turnConfig.MotionMagic.MotionMagicExpo_kA = ctre::unit::volts_per_turn_per_second_squared_t{0.1};
@@ -83,7 +83,7 @@ ModuleIOTalonFX::ModuleIOTalonFX(const ModuleConstants& constants)
     turnPositionQueue_ = PhoenixOdometryThread::GetInstance().RegisterSignal(turnPosition_);
 
     // Configure periodic frames
-    BaseStatusSignal::SetUpdateFrequencyForAll(units::hertz_t{Drive::GetOdometryFrequency()}, drivePosition_, turnPosition_);
+    BaseStatusSignal::SetUpdateFrequencyForAll(wpi::units::hertz_t{Drive::GetOdometryFrequency()}, drivePosition_, turnPosition_);
     BaseStatusSignal::SetUpdateFrequencyForAll(50_Hz, driveVelocity_, driveAppliedVolts_, driveCurrent_, turnAbsolutePosition_, turnVelocity_,
                                                turnAppliedVolts_, turnCurrent_);
     hardware::ParentDevice::OptimizeBusUtilizationForAll(driveTalon_, turnTalon_);
@@ -97,17 +97,17 @@ void ModuleIOTalonFX::UpdateInputs(ModuleIOInputs& inputs) {
 
     // Update drive inputs
     inputs.driveConnected = driveConnectedDebounce_.Calculate(driveStatus.IsOK());
-    inputs.drivePositionRad = units::radian_t{drivePosition_.GetValue()}.value();
-    inputs.driveVelocityRadPerSec = units::radians_per_second_t{driveVelocity_.GetValue()}.value();
+    inputs.drivePositionRad = wpi::units::radian_t{drivePosition_.GetValue()}.value();
+    inputs.driveVelocityRadPerSec = wpi::units::radians_per_second_t{driveVelocity_.GetValue()}.value();
     inputs.driveAppliedVolts = driveAppliedVolts_.GetValue().value();
     inputs.driveCurrentAmps = driveCurrent_.GetValue().value();
 
     // Update turn inputs
     inputs.turnConnected = turnConnectedDebounce_.Calculate(turnStatus.IsOK());
     inputs.turnEncoderConnected = turnEncoderConnectedDebounce_.Calculate(turnEncoderStatus.IsOK());
-    inputs.turnAbsolutePosition = frc::Rotation2d{turnAbsolutePosition_.GetValue()};
-    inputs.turnPosition = frc::Rotation2d{turnPosition_.GetValue()};
-    inputs.turnVelocityRadPerSec = units::radians_per_second_t{turnVelocity_.GetValue()}.value();
+    inputs.turnAbsolutePosition = wpi::math::Rotation2d{turnAbsolutePosition_.GetValue()};
+    inputs.turnPosition = wpi::math::Rotation2d{turnPosition_.GetValue()};
+    inputs.turnVelocityRadPerSec = wpi::units::radians_per_second_t{turnVelocity_.GetValue()}.value();
     inputs.turnAppliedVolts = turnAppliedVolts_.GetValue().value();
     inputs.turnCurrentAmps = turnCurrent_.GetValue().value();
 
@@ -115,55 +115,55 @@ void ModuleIOTalonFX::UpdateInputs(ModuleIOInputs& inputs) {
     inputs.odometryTimestamps = timestampQueue_->Drain();
     inputs.odometryDrivePositionsRad.clear();
     for (double value : drivePositionQueue_->Drain()) {
-        inputs.odometryDrivePositionsRad.push_back(units::radian_t{units::turn_t{value}}.value());
+        inputs.odometryDrivePositionsRad.push_back(wpi::units::radian_t{wpi::units::turn_t{value}}.value());
     }
     inputs.odometryTurnPositions.clear();
     for (double value : turnPositionQueue_->Drain()) {
-        inputs.odometryTurnPositions.push_back(frc::Rotation2d{units::turn_t{value}});
+        inputs.odometryTurnPositions.push_back(wpi::math::Rotation2d{wpi::units::turn_t{value}});
     }
 }
 
 void ModuleIOTalonFX::SetDriveOpenLoop(double output) {
     switch (constants_.DriveMotorClosedLoopOutput) {
-        case swerve::ClosedLoopOutputType::Voltage:
-            driveTalon_.SetControl(voltageRequest_.WithOutput(units::volt_t{output}));
-            break;
-        case swerve::ClosedLoopOutputType::TorqueCurrentFOC:
-            driveTalon_.SetControl(torqueCurrentRequest_.WithOutput(units::ampere_t{output}));
-            break;
+    case swerve::ClosedLoopOutputType::Voltage:
+        driveTalon_.SetControl(voltageRequest_.WithOutput(wpi::units::volt_t{output}));
+        break;
+    case swerve::ClosedLoopOutputType::TorqueCurrentFOC:
+        driveTalon_.SetControl(torqueCurrentRequest_.WithOutput(wpi::units::ampere_t{output}));
+        break;
     }
 }
 
 void ModuleIOTalonFX::SetTurnOpenLoop(double output) {
     switch (constants_.SteerMotorClosedLoopOutput) {
-        case swerve::ClosedLoopOutputType::Voltage:
-            turnTalon_.SetControl(voltageRequest_.WithOutput(units::volt_t{output}));
-            break;
-        case swerve::ClosedLoopOutputType::TorqueCurrentFOC:
-            turnTalon_.SetControl(torqueCurrentRequest_.WithOutput(units::ampere_t{output}));
-            break;
+    case swerve::ClosedLoopOutputType::Voltage:
+        turnTalon_.SetControl(voltageRequest_.WithOutput(wpi::units::volt_t{output}));
+        break;
+    case swerve::ClosedLoopOutputType::TorqueCurrentFOC:
+        turnTalon_.SetControl(torqueCurrentRequest_.WithOutput(wpi::units::ampere_t{output}));
+        break;
     }
 }
 
 void ModuleIOTalonFX::SetDriveVelocity(double velocityRadPerSec) {
-    units::turns_per_second_t velocityRotPerSec{units::radians_per_second_t{velocityRadPerSec}};
+    wpi::units::turns_per_second_t velocityRotPerSec{wpi::units::radians_per_second_t{velocityRadPerSec}};
     switch (constants_.DriveMotorClosedLoopOutput) {
-        case swerve::ClosedLoopOutputType::Voltage:
-            driveTalon_.SetControl(velocityVoltageRequest_.WithVelocity(velocityRotPerSec));
-            break;
-        case swerve::ClosedLoopOutputType::TorqueCurrentFOC:
-            driveTalon_.SetControl(velocityTorqueCurrentRequest_.WithVelocity(velocityRotPerSec));
-            break;
+    case swerve::ClosedLoopOutputType::Voltage:
+        driveTalon_.SetControl(velocityVoltageRequest_.WithVelocity(velocityRotPerSec));
+        break;
+    case swerve::ClosedLoopOutputType::TorqueCurrentFOC:
+        driveTalon_.SetControl(velocityTorqueCurrentRequest_.WithVelocity(velocityRotPerSec));
+        break;
     }
 }
 
-void ModuleIOTalonFX::SetTurnPosition(const frc::Rotation2d& rotation) {
+void ModuleIOTalonFX::SetTurnPosition(const wpi::math::Rotation2d& rotation) {
     switch (constants_.SteerMotorClosedLoopOutput) {
-        case swerve::ClosedLoopOutputType::Voltage:
-            turnTalon_.SetControl(positionVoltageRequest_.WithPosition(rotation.Radians()));
-            break;
-        case swerve::ClosedLoopOutputType::TorqueCurrentFOC:
-            turnTalon_.SetControl(positionTorqueCurrentRequest_.WithPosition(rotation.Radians()));
-            break;
+    case swerve::ClosedLoopOutputType::Voltage:
+        turnTalon_.SetControl(positionVoltageRequest_.WithPosition(rotation.Radians()));
+        break;
+    case swerve::ClosedLoopOutputType::TorqueCurrentFOC:
+        turnTalon_.SetControl(positionTorqueCurrentRequest_.WithPosition(rotation.Radians()));
+        break;
     }
 }

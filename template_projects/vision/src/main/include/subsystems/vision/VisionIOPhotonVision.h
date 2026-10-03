@@ -9,8 +9,8 @@
 
 #include <string_view>
 
-#include <frc/geometry/Transform3d.h>
 #include <photon/PhotonCamera.h>
+#include <wpi/math/geometry/Transform3d.hpp>
 
 #include "subsystems/vision/VisionIO.h"
 
@@ -23,11 +23,11 @@ public:
      * @param name The configured name of the camera.
      * @param robotToCamera The 3D position of the camera relative to the robot.
      */
-    VisionIOPhotonVision(std::string_view name, const frc::Transform3d& robotToCamera);
+    VisionIOPhotonVision(std::string_view name, const wpi::math::Transform3d& robotToCamera);
 
     void UpdateInputs(VisionIOInputs& inputs) override;
 
 protected:
     photon::PhotonCamera camera_;
-    frc::Transform3d robotToCamera_;
+    wpi::math::Transform3d robotToCamera_;
 };

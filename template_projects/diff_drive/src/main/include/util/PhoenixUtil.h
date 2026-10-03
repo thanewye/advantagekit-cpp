@@ -9,7 +9,6 @@
 
 #include <functional>
 
-#include <ctre/phoenix/ErrorCode.h>
 #include <ctre/phoenix/StatusCodes.h>
 
 namespace PhoenixUtil {
@@ -21,11 +20,4 @@ namespace PhoenixUtil {
         }
     }
 
-    /** Attempts to run the command until no error is produced. */
-    inline void TryUntilOkV5(int maxAttempts, const std::function<ctre::phoenix::ErrorCode()>& command) {
-        for (int i = 0; i < maxAttempts; i++) {
-            auto error = command();
-            if (error == ctre::phoenix::ErrorCode::OK) break;
-        }
-    }
 } // namespace PhoenixUtil

@@ -22,60 +22,51 @@ DriveIOSpark::DriveIOSpark() {
     // Create config
     rev::spark::SparkMaxConfig config;
     config.SetIdleMode(rev::spark::SparkBaseConfig::IdleMode::kBrake).SmartCurrentLimit(currentLimit).VoltageCompensation(12.0);
-    config.closedLoop.Pid(realKp, 0.0, realKd);
-    config.encoder
-        .PositionConversionFactor(2 * std::numbers::pi / motorReduction)        // Rotor Rotations -> Wheel Radians
-        .VelocityConversionFactor((2 * std::numbers::pi) / 60.0 / motorReduction) // Rotor RPM -> Wheel Rad/Sec
-        .UvwMeasurementPeriod(10)
-        .UvwAverageDepth(2);
+    config.closedLoop.Pid(realKp * (2 * std::numbers::pi / 60.0 / motorReduction), 0.0, realKd * (2 * std::numbers::pi / 60.0 / motorReduction));
 
     // Apply config to leaders
     config.Inverted(leftInverted);
-    TryUntilOk(leftLeader_, 5, [&] {
-        return leftLeader_.Configure(config, rev::ResetMode::kResetSafeParameters, rev::PersistMode::kPersistParameters);
-    });
+    TryUntilOk(leftLeader_, 5, [&] { return leftLeader_.Configure(config, rev::ResetMode::kResetSafeParameters, rev::PersistMode::kPersistParameters); });
     config.Inverted(rightInverted);
-    TryUntilOk(rightLeader_, 5, [&] {
-        return rightLeader_.Configure(config, rev::ResetMode::kResetSafeParameters, rev::PersistMode::kPersistParameters);
-    });
+    TryUntilOk(rightLeader_, 5, [&] { return rightLeader_.Configure(config, rev::ResetMode::kResetSafeParameters, rev::PersistMode::kPersistParameters); });
 
     // Apply config to followers
     config.Inverted(leftInverted).Follow(leftLeader_);
-    TryUntilOk(leftFollower_, 5, [&] {
-        return leftFollower_.Configure(config, rev::ResetMode::kResetSafeParameters, rev::PersistMode::kPersistParameters);
-    });
+    TryUntilOk(leftFollower_, 5, [&] { return leftFollower_.Configure(config, rev::ResetMode::kResetSafeParameters, rev::PersistMode::kPersistParameters); });
     config.Inverted(rightInverted).Follow(rightLeader_);
-    TryUntilOk(rightFollower_, 5, [&] {
-        return rightFollower_.Configure(config, rev::ResetMode::kResetSafeParameters, rev::PersistMode::kPersistParameters);
-    });
+    TryUntilOk(rightFollower_, 5, [&] { return rightFollower_.Configure(config, rev::ResetMode::kResetSafeParameters, rev::PersistMode::kPersistParameters); });
 }
 
 void DriveIOSpark::UpdateInputs(DriveIOInputs& inputs) {
-    IfOk(leftLeader_, [&] { return leftEncoder_.GetPosition(); }, [&](double value) { inputs.leftPositionRad = value; });
-    IfOk(leftLeader_, [&] { return leftEncoder_.GetVelocity(); }, [&](double value) { inputs.leftVelocityRadPerSec = value; });
-    const std::array<std::function<double()>, 2> leftVoltageSuppliers{[&] { return leftLeader_.GetAppliedOutput(); },
-                                                                      [&] { return leftLeader_.GetBusVoltage(); }};
-    IfOk(leftLeader_, leftVoltageSuppliers, [&](const std::vector<double>& values) { inputs.leftAppliedVolts = values[0] * values[1]; });
-    const std::array<std::function<double()>, 2> leftCurrentSuppliers{[&] { return leftLeader_.GetOutputCurrent(); },
-                                                                      [&] { return leftFollower_.GetOutputCurrent(); }};
-    IfOk(leftLeader_, leftCurrentSuppliers, [&](const std::vector<double>& values) { inputs.leftCurrentAmps = values; });
+    IfOk([&] { return leftEncoder_.GetPosition(); }, [&](double value) { inputs.leftPositionRad = value * (2 * std::numbers::pi / motorReduction); });
+    IfOk([&] { return leftEncoder_.GetVelocity(); },
+         [&](double value) { inputs.leftVelocityRadPerSec = value * (2 * std::numbers::pi / 60.0 / motorReduction); });
+    const std::array<std::function<rev::util::Signal<double>()>, 2> leftVoltageSuppliers{[&] { return leftLeader_.GetAppliedOutput(); },
+                                                                                         [&] { return leftLeader_.GetBusVoltage(); }};
+    IfOk(leftVoltageSuppliers, [&](const std::vector<double>& values) { inputs.leftAppliedVolts = values[0] * values[1]; });
+    const std::array<std::function<rev::util::Signal<double>()>, 2> leftCurrentSuppliers{[&] { return leftLeader_.GetOutputCurrent(); },
+                                                                                         [&] { return leftFollower_.GetOutputCurrent(); }};
+    IfOk(leftCurrentSuppliers, [&](const std::vector<double>& values) { inputs.leftCurrentAmps = values; });
 
-    IfOk(rightLeader_, [&] { return rightEncoder_.GetPosition(); }, [&](double value) { inputs.rightPositionRad = value; });
-    IfOk(rightLeader_, [&] { return rightEncoder_.GetVelocity(); }, [&](double value) { inputs.rightVelocityRadPerSec = value; });
-    const std::array<std::function<double()>, 2> rightVoltageSuppliers{[&] { return rightLeader_.GetAppliedOutput(); },
-                                                                       [&] { return rightLeader_.GetBusVoltage(); }};
-    IfOk(rightLeader_, rightVoltageSuppliers, [&](const std::vector<double>& values) { inputs.rightAppliedVolts = values[0] * values[1]; });
-    const std::array<std::function<double()>, 2> rightCurrentSuppliers{[&] { return rightLeader_.GetOutputCurrent(); },
-                                                                       [&] { return rightLeader_.GetOutputCurrent(); }};
-    IfOk(rightLeader_, rightCurrentSuppliers, [&](const std::vector<double>& values) { inputs.rightCurrentAmps = values; });
+    IfOk([&] { return rightEncoder_.GetPosition(); }, [&](double value) { inputs.rightPositionRad = value * (2 * std::numbers::pi / motorReduction); });
+    IfOk([&] { return rightEncoder_.GetVelocity(); },
+         [&](double value) { inputs.rightVelocityRadPerSec = value * (2 * std::numbers::pi / 60.0 / motorReduction); });
+    const std::array<std::function<rev::util::Signal<double>()>, 2> rightVoltageSuppliers{[&] { return rightLeader_.GetAppliedOutput(); },
+                                                                                          [&] { return rightLeader_.GetBusVoltage(); }};
+    IfOk(rightVoltageSuppliers, [&](const std::vector<double>& values) { inputs.rightAppliedVolts = values[0] * values[1]; });
+    const std::array<std::function<rev::util::Signal<double>()>, 2> rightCurrentSuppliers{[&] { return rightLeader_.GetOutputCurrent(); },
+                                                                                          [&] { return rightLeader_.GetOutputCurrent(); }};
+    IfOk(rightCurrentSuppliers, [&](const std::vector<double>& values) { inputs.rightCurrentAmps = values; });
 }
 
 void DriveIOSpark::SetVoltage(double leftVolts, double rightVolts) {
-    leftLeader_.SetVoltage(units::volt_t{leftVolts});
-    rightLeader_.SetVoltage(units::volt_t{rightVolts});
+    leftLeader_.SetVoltage(wpi::units::volt_t{leftVolts});
+    rightLeader_.SetVoltage(wpi::units::volt_t{rightVolts});
 }
 
 void DriveIOSpark::SetVelocity(double leftRadPerSec, double rightRadPerSec, double leftFFVolts, double rightFFVolts) {
-    leftController_.SetSetpoint(leftRadPerSec, rev::spark::SparkLowLevel::ControlType::kVelocity, rev::spark::ClosedLoopSlot::kSlot0, leftFFVolts);
-    rightController_.SetSetpoint(rightRadPerSec, rev::spark::SparkLowLevel::ControlType::kVelocity, rev::spark::ClosedLoopSlot::kSlot0, rightFFVolts);
+    leftController_.SetSetpoint(leftRadPerSec / (2 * std::numbers::pi / 60.0 / motorReduction), rev::spark::SparkLowLevel::ControlType::kVelocity,
+                                rev::spark::ClosedLoopSlot::kSlot0, leftFFVolts);
+    rightController_.SetSetpoint(rightRadPerSec / (2 * std::numbers::pi / 60.0 / motorReduction), rev::spark::SparkLowLevel::ControlType::kVelocity,
+                                 rev::spark::ClosedLoopSlot::kSlot0, rightFFVolts);
 }

@@ -26,10 +26,10 @@ public:
     void SetVelocity(double leftRadPerSec, double rightRadPerSec, double leftFFVolts, double rightFFVolts) override;
 
 private:
-    rev::spark::SparkMax leftLeader_{DriveConstants::leftLeaderCanId, rev::spark::SparkMax::MotorType::kBrushless};
-    rev::spark::SparkMax rightLeader_{DriveConstants::rightLeaderCanId, rev::spark::SparkMax::MotorType::kBrushless};
-    rev::spark::SparkMax leftFollower_{DriveConstants::leftFollowerCanId, rev::spark::SparkMax::MotorType::kBrushless};
-    rev::spark::SparkMax rightFollower_{DriveConstants::rightFollowerCanId, rev::spark::SparkMax::MotorType::kBrushless};
+    rev::spark::SparkMax leftLeader_{wpi::CANPort::CAN_S0, DriveConstants::leftLeaderCanId, rev::spark::SparkMax::MotorType::kBrushless};
+    rev::spark::SparkMax rightLeader_{wpi::CANPort::CAN_S0, DriveConstants::rightLeaderCanId, rev::spark::SparkMax::MotorType::kBrushless};
+    rev::spark::SparkMax leftFollower_{wpi::CANPort::CAN_S0, DriveConstants::leftFollowerCanId, rev::spark::SparkMax::MotorType::kBrushless};
+    rev::spark::SparkMax rightFollower_{wpi::CANPort::CAN_S0, DriveConstants::rightFollowerCanId, rev::spark::SparkMax::MotorType::kBrushless};
     rev::spark::SparkRelativeEncoder& leftEncoder_ = leftLeader_.GetEncoder();
     rev::spark::SparkRelativeEncoder& rightEncoder_ = rightLeader_.GetEncoder();
     rev::spark::SparkClosedLoopController& leftController_ = leftLeader_.GetClosedLoopController();

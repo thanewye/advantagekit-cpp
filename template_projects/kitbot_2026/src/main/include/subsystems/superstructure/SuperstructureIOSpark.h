@@ -26,8 +26,8 @@ public:
     void SetIntakeLauncherVoltage(double volts) override;
 
 private:
-    rev::spark::SparkMax feeder_{SuperstructureConstants::feederCanId, rev::spark::SparkMax::MotorType::kBrushless};
-    rev::spark::SparkMax intakeLauncher_{SuperstructureConstants::intakeLauncherCanId, rev::spark::SparkMax::MotorType::kBrushless};
+    rev::spark::SparkMax feeder_{wpi::CANPort::CAN_S0, SuperstructureConstants::feederCanId, rev::spark::SparkMax::MotorType::kBrushless};
+    rev::spark::SparkMax intakeLauncher_{wpi::CANPort::CAN_S0, SuperstructureConstants::intakeLauncherCanId, rev::spark::SparkMax::MotorType::kBrushless};
     rev::spark::SparkRelativeEncoder& feederEncoder_ = feeder_.GetEncoder();
     rev::spark::SparkRelativeEncoder& intakeLauncherEncoder_ = intakeLauncher_.GetEncoder();
 };

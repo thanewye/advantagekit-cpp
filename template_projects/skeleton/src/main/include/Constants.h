@@ -7,11 +7,11 @@
 
 #pragma once
 
-#include <frc/RobotBase.h>
+#include <wpi/framework/RobotBase.hpp>
 
 /**
  * This namespace defines the runtime mode used by AdvantageKit. The mode is always "real" when
- * running on a roboRIO. Change the value of "kSimMode" to switch between "sim" (physics sim) and
+ * running on a Systemcore. Change the value of "kSimMode" to switch between "sim" (physics sim) and
  * "replay" (log replay from a file).
  */
 namespace Constants {
@@ -29,6 +29,6 @@ namespace Constants {
     inline constexpr Mode kSimMode = Mode::kSim;
 
     inline Mode GetCurrentMode() {
-        return frc::RobotBase::IsReal() ? Mode::kReal : kSimMode;
+        return wpi::RobotBase::IsReal() ? Mode::kReal : kSimMode;
     }
 } // namespace Constants

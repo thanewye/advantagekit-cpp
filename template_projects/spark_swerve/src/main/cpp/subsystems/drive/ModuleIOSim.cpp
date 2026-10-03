@@ -11,8 +11,8 @@
 #include <cmath>
 #include <numbers>
 
-#include <frc/Timer.h>
-#include <frc/system/plant/LinearSystemId.h>
+#include <wpi/math/system/Models.hpp>
+#include <wpi/system/Timer.hpp>
 
 #include "subsystems/drive/DriveConstants.h"
 
@@ -20,8 +20,8 @@ using namespace DriveConstants;
 
 ModuleIOSim::ModuleIOSim()
     // Create drive and turn sim models
-    : driveSim_(frc::LinearSystemId::DCMotorSystem(driveGearbox, 0.025_kg_sq_m, driveMotorReduction), driveGearbox)
-    , turnSim_(frc::LinearSystemId::DCMotorSystem(turnGearbox, 0.004_kg_sq_m, turnMotorReduction), turnGearbox)
+    : driveSim_(wpi::math::Models::SingleJointedArmFromPhysicalConstants(driveGearbox, 0.025_kg_sq_m, driveMotorReduction), driveGearbox)
+    , turnSim_(wpi::math::Models::SingleJointedArmFromPhysicalConstants(turnGearbox, 0.004_kg_sq_m, turnMotorReduction), turnGearbox)
     , driveController_(driveSimP, 0, driveSimD)
     , turnController_(turnSimP, 0, turnSimD) {
     // Enable wrapping for turn PID
@@ -42,8 +42,8 @@ void ModuleIOSim::UpdateInputs(ModuleIOInputs& inputs) {
     }
 
     // Update simulation state
-    driveSim_.SetInputVoltage(units::volt_t{std::clamp(driveAppliedVolts_, -12.0, 12.0)});
-    turnSim_.SetInputVoltage(units::volt_t{std::clamp(turnAppliedVolts_, -12.0, 12.0)});
+    driveSim_.SetInputVoltage(wpi::units::volt_t{std::clamp(driveAppliedVolts_, -12.0, 12.0)});
+    turnSim_.SetInputVoltage(wpi::units::volt_t{std::clamp(turnAppliedVolts_, -12.0, 12.0)});
     driveSim_.Update(20_ms);
     turnSim_.Update(20_ms);
 
@@ -56,14 +56,14 @@ void ModuleIOSim::UpdateInputs(ModuleIOInputs& inputs) {
 
     // Update turn inputs
     inputs.turnConnected = true;
-    inputs.turnPosition = frc::Rotation2d{turnSim_.GetAngularPosition()};
+    inputs.turnPosition = wpi::math::Rotation2d{turnSim_.GetAngularPosition()};
     inputs.turnVelocityRadPerSec = turnSim_.GetAngularVelocity().value();
     inputs.turnAppliedVolts = turnAppliedVolts_;
     inputs.turnCurrentAmps = std::abs(turnSim_.GetCurrentDraw().value());
 
     // Update odometry inputs (50Hz because high-frequency odometry in sim doesn't
     // matter)
-    inputs.odometryTimestamps = {frc::Timer::GetFPGATimestamp().value()};
+    inputs.odometryTimestamps = {wpi::Timer::GetTimestamp().value()};
     inputs.odometryDrivePositionsRad = {inputs.drivePositionRad};
     inputs.odometryTurnPositions = {inputs.turnPosition};
 }
@@ -84,7 +84,7 @@ void ModuleIOSim::SetDriveVelocity(double velocityRadPerSec) {
     driveController_.SetSetpoint(velocityRadPerSec);
 }
 
-void ModuleIOSim::SetTurnPosition(const frc::Rotation2d& rotation) {
+void ModuleIOSim::SetTurnPosition(const wpi::math::Rotation2d& rotation) {
     turnClosedLoop_ = true;
     turnController_.SetSetpoint(rotation.Radians().value());
 }

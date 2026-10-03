@@ -13,18 +13,18 @@ void DemoDrive::Periodic() {
 }
 
 void DemoDrive::Run(double xAxis, double zAxis) {
-    sim_.SetInputs(units::volt_t{(xAxis - zAxis) * 12.0}, units::volt_t{(xAxis + zAxis) * 12.0});
+    sim_.SetInputs(wpi::units::volt_t{(xAxis - zAxis) * 12.0}, wpi::units::volt_t{(xAxis + zAxis) * 12.0});
 }
 
-frc::Pose2d DemoDrive::GetPose() const {
+wpi::math::Pose2d DemoDrive::GetPose() const {
     return poseEstimator_.GetEstimatedPosition();
 }
 
-frc::Rotation2d DemoDrive::GetRotation() const {
+wpi::math::Rotation2d DemoDrive::GetRotation() const {
     return GetPose().Rotation();
 }
 
-void DemoDrive::AddVisionMeasurement(const frc::Pose2d& visionRobotPoseMeters, units::second_t timestampSeconds,
-                                     const wpi::array<double, 3>& visionMeasurementStdDevs) {
+void DemoDrive::AddVisionMeasurement(const wpi::math::Pose2d& visionRobotPoseMeters, wpi::units::second_t timestampSeconds,
+                                     const wpi::util::array<double, 3>& visionMeasurementStdDevs) {
     poseEstimator_.AddVisionMeasurement(visionRobotPoseMeters, timestampSeconds, visionMeasurementStdDevs);
 }

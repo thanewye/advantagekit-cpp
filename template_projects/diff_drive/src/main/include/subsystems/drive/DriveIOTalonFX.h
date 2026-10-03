@@ -8,10 +8,10 @@
 #pragma once
 
 #include <ctre/phoenix6/TalonFX.hpp>
-#include <units/angle.h>
-#include <units/angular_velocity.h>
-#include <units/current.h>
-#include <units/voltage.h>
+#include <wpi/units/angle.hpp>
+#include <wpi/units/angular_velocity.hpp>
+#include <wpi/units/current.hpp>
+#include <wpi/units/voltage.hpp>
 
 #include "subsystems/drive/DriveConstants.h"
 #include "subsystems/drive/DriveIO.h"
@@ -26,22 +26,22 @@ public:
     void SetVelocity(double leftRadPerSec, double rightRadPerSec, double leftFFVolts, double rightFFVolts) override;
 
 private:
-    ctre::phoenix6::hardware::TalonFX leftLeader_{DriveConstants::leftLeaderCanId};
-    ctre::phoenix6::hardware::TalonFX leftFollower_{DriveConstants::leftFollowerCanId};
-    ctre::phoenix6::hardware::TalonFX rightLeader_{DriveConstants::rightLeaderCanId};
-    ctre::phoenix6::hardware::TalonFX rightFollower_{DriveConstants::rightFollowerCanId};
+    ctre::phoenix6::hardware::TalonFX leftLeader_{DriveConstants::leftLeaderCanId, ctre::phoenix6::CANBus{wpi::CANPort::CAN_S0}};
+    ctre::phoenix6::hardware::TalonFX leftFollower_{DriveConstants::leftFollowerCanId, ctre::phoenix6::CANBus{wpi::CANPort::CAN_S0}};
+    ctre::phoenix6::hardware::TalonFX rightLeader_{DriveConstants::rightLeaderCanId, ctre::phoenix6::CANBus{wpi::CANPort::CAN_S0}};
+    ctre::phoenix6::hardware::TalonFX rightFollower_{DriveConstants::rightFollowerCanId, ctre::phoenix6::CANBus{wpi::CANPort::CAN_S0}};
 
-    ctre::phoenix6::StatusSignal<units::turn_t> leftPosition_ = leftLeader_.GetPosition();
-    ctre::phoenix6::StatusSignal<units::turns_per_second_t> leftVelocity_ = leftLeader_.GetVelocity();
-    ctre::phoenix6::StatusSignal<units::volt_t> leftAppliedVolts_ = leftLeader_.GetMotorVoltage();
-    ctre::phoenix6::StatusSignal<units::ampere_t> leftLeaderCurrent_ = leftLeader_.GetSupplyCurrent();
-    ctre::phoenix6::StatusSignal<units::ampere_t> leftFollowerCurrent_ = leftFollower_.GetSupplyCurrent();
+    ctre::phoenix6::StatusSignal<wpi::units::turn_t> leftPosition_ = leftLeader_.GetPosition();
+    ctre::phoenix6::StatusSignal<wpi::units::turns_per_second_t> leftVelocity_ = leftLeader_.GetVelocity();
+    ctre::phoenix6::StatusSignal<wpi::units::volt_t> leftAppliedVolts_ = leftLeader_.GetMotorVoltage();
+    ctre::phoenix6::StatusSignal<wpi::units::ampere_t> leftLeaderCurrent_ = leftLeader_.GetSupplyCurrent();
+    ctre::phoenix6::StatusSignal<wpi::units::ampere_t> leftFollowerCurrent_ = leftFollower_.GetSupplyCurrent();
 
-    ctre::phoenix6::StatusSignal<units::turn_t> rightPosition_ = rightLeader_.GetPosition();
-    ctre::phoenix6::StatusSignal<units::turns_per_second_t> rightVelocity_ = rightLeader_.GetVelocity();
-    ctre::phoenix6::StatusSignal<units::volt_t> rightAppliedVolts_ = rightLeader_.GetMotorVoltage();
-    ctre::phoenix6::StatusSignal<units::ampere_t> rightLeaderCurrent_ = rightLeader_.GetSupplyCurrent();
-    ctre::phoenix6::StatusSignal<units::ampere_t> rightFollowerCurrent_ = rightFollower_.GetSupplyCurrent();
+    ctre::phoenix6::StatusSignal<wpi::units::turn_t> rightPosition_ = rightLeader_.GetPosition();
+    ctre::phoenix6::StatusSignal<wpi::units::turns_per_second_t> rightVelocity_ = rightLeader_.GetVelocity();
+    ctre::phoenix6::StatusSignal<wpi::units::volt_t> rightAppliedVolts_ = rightLeader_.GetMotorVoltage();
+    ctre::phoenix6::StatusSignal<wpi::units::ampere_t> rightLeaderCurrent_ = rightLeader_.GetSupplyCurrent();
+    ctre::phoenix6::StatusSignal<wpi::units::ampere_t> rightFollowerCurrent_ = rightFollower_.GetSupplyCurrent();
 
     ctre::phoenix6::controls::VoltageOut voltageRequest_{0_V};
     ctre::phoenix6::controls::VelocityVoltage velocityRequest_{0_tps};

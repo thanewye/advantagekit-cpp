@@ -11,11 +11,11 @@
 
 #include <ctre/phoenix6/CANdi.hpp>
 #include <ctre/phoenix6/TalonFXS.hpp>
-#include <frc/filter/Debouncer.h>
-#include <units/angle.h>
-#include <units/angular_velocity.h>
-#include <units/current.h>
-#include <units/voltage.h>
+#include <wpi/math/filter/Debouncer.hpp>
+#include <wpi/units/angle.hpp>
+#include <wpi/units/angular_velocity.hpp>
+#include <wpi/units/current.hpp>
+#include <wpi/units/voltage.hpp>
 
 #include "generated/TunerConstants.h"
 #include "subsystems/drive/ModuleIO.h"
@@ -29,8 +29,7 @@
  */
 class ModuleIOTalonFXS : public ModuleIO {
 public:
-    using ModuleConstants =
-        swerve::SwerveModuleConstants<configs::TalonFXSConfiguration, configs::TalonFXSConfiguration, configs::CANdiConfiguration>;
+    using ModuleConstants = swerve::SwerveModuleConstants<configs::TalonFXSConfiguration, configs::TalonFXSConfiguration, configs::CANdiConfiguration>;
 
     explicit ModuleIOTalonFXS(const ModuleConstants& constants);
 
@@ -38,7 +37,7 @@ public:
     void SetDriveOpenLoop(double output) override;
     void SetTurnOpenLoop(double output) override;
     void SetDriveVelocity(double velocityRadPerSec) override;
-    void SetTurnPosition(const frc::Rotation2d& rotation) override;
+    void SetTurnPosition(const wpi::math::Rotation2d& rotation) override;
 
 private:
     // Hardware objects
@@ -55,22 +54,22 @@ private:
     std::shared_ptr<OdometryQueue> timestampQueue_;
 
     // Inputs from drive motor
-    StatusSignal<units::turn_t> drivePosition_ = driveTalon_.GetPosition();
+    StatusSignal<wpi::units::turn_t> drivePosition_ = driveTalon_.GetPosition();
     std::shared_ptr<OdometryQueue> drivePositionQueue_;
-    StatusSignal<units::turns_per_second_t> driveVelocity_ = driveTalon_.GetVelocity();
-    StatusSignal<units::volt_t> driveAppliedVolts_ = driveTalon_.GetMotorVoltage();
-    StatusSignal<units::ampere_t> driveCurrent_ = driveTalon_.GetStatorCurrent();
+    StatusSignal<wpi::units::turns_per_second_t> driveVelocity_ = driveTalon_.GetVelocity();
+    StatusSignal<wpi::units::volt_t> driveAppliedVolts_ = driveTalon_.GetMotorVoltage();
+    StatusSignal<wpi::units::ampere_t> driveCurrent_ = driveTalon_.GetStatorCurrent();
 
     // Inputs from turn motor
-    StatusSignal<units::turn_t> turnAbsolutePosition_ = candi_.GetPWM1Position();
-    StatusSignal<units::turn_t> turnPosition_ = turnTalon_.GetPosition();
+    StatusSignal<wpi::units::turn_t> turnAbsolutePosition_ = candi_.GetPWM1Position();
+    StatusSignal<wpi::units::turn_t> turnPosition_ = turnTalon_.GetPosition();
     std::shared_ptr<OdometryQueue> turnPositionQueue_;
-    StatusSignal<units::turns_per_second_t> turnVelocity_ = turnTalon_.GetVelocity();
-    StatusSignal<units::volt_t> turnAppliedVolts_ = turnTalon_.GetMotorVoltage();
-    StatusSignal<units::ampere_t> turnCurrent_ = turnTalon_.GetStatorCurrent();
+    StatusSignal<wpi::units::turns_per_second_t> turnVelocity_ = turnTalon_.GetVelocity();
+    StatusSignal<wpi::units::volt_t> turnAppliedVolts_ = turnTalon_.GetMotorVoltage();
+    StatusSignal<wpi::units::ampere_t> turnCurrent_ = turnTalon_.GetStatorCurrent();
 
     // Connection debouncers
-    frc::Debouncer driveConnectedDebounce_{0.5_s, frc::Debouncer::DebounceType::kFalling};
-    frc::Debouncer turnConnectedDebounce_{0.5_s, frc::Debouncer::DebounceType::kFalling};
-    frc::Debouncer turnEncoderConnectedDebounce_{0.5_s, frc::Debouncer::DebounceType::kFalling};
+    wpi::math::Debouncer driveConnectedDebounce_{0.5_s, wpi::math::Debouncer::DebounceType::FALLING};
+    wpi::math::Debouncer turnConnectedDebounce_{0.5_s, wpi::math::Debouncer::DebounceType::FALLING};
+    wpi::math::Debouncer turnEncoderConnectedDebounce_{0.5_s, wpi::math::Debouncer::DebounceType::FALLING};
 };

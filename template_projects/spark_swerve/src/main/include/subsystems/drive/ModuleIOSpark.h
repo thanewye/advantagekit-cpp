@@ -9,10 +9,10 @@
 
 #include <memory>
 
-#include <frc/filter/Debouncer.h>
-#include <frc/geometry/Rotation2d.h>
 #include <rev/SparkFlex.h>
 #include <rev/SparkMax.h>
+#include <wpi/math/filter/Debouncer.hpp>
+#include <wpi/math/geometry/Rotation2d.hpp>
 
 #include "subsystems/drive/ModuleIO.h"
 #include "subsystems/drive/OdometryQueue.h"
@@ -29,10 +29,10 @@ public:
     void SetDriveOpenLoop(double output) override;
     void SetTurnOpenLoop(double output) override;
     void SetDriveVelocity(double velocityRadPerSec) override;
-    void SetTurnPosition(const frc::Rotation2d& rotation) override;
+    void SetTurnPosition(const wpi::math::Rotation2d& rotation) override;
 
 private:
-    frc::Rotation2d zeroRotation_;
+    wpi::math::Rotation2d zeroRotation_;
 
     // Hardware objects
     rev::spark::SparkFlex driveSpark_;
@@ -50,6 +50,6 @@ private:
     std::shared_ptr<OdometryQueue> turnPositionQueue_;
 
     // Connection debouncers
-    frc::Debouncer driveConnectedDebounce_{0.5_s, frc::Debouncer::DebounceType::kFalling};
-    frc::Debouncer turnConnectedDebounce_{0.5_s, frc::Debouncer::DebounceType::kFalling};
+    wpi::math::Debouncer driveConnectedDebounce_{0.5_s, wpi::math::Debouncer::DebounceType::FALLING};
+    wpi::math::Debouncer turnConnectedDebounce_{0.5_s, wpi::math::Debouncer::DebounceType::FALLING};
 };

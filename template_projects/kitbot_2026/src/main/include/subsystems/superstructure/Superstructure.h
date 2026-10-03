@@ -9,25 +9,25 @@
 
 #include <memory>
 
-#include <frc2/command/CommandPtr.h>
-#include <frc2/command/SubsystemBase.h>
+#include <wpi/commands2/CommandPtr.hpp>
+#include <wpi/commands2/SubsystemBase.hpp>
 
 #include "subsystems/superstructure/SuperstructureIO.h"
 
-class Superstructure : public frc2::SubsystemBase {
+class Superstructure : public wpi::cmd::SubsystemBase {
 public:
     explicit Superstructure(std::unique_ptr<SuperstructureIO> io);
 
     void Periodic() override;
 
     /** Set the rollers to the values for intaking. */
-    frc2::CommandPtr Intake();
+    wpi::cmd::CommandPtr Intake();
 
     /** Set the rollers to the values for ejecting fuel out the intake. */
-    frc2::CommandPtr Eject();
+    wpi::cmd::CommandPtr Eject();
 
     /** Set the rollers to the values for launching. Spins up before feeding fuel. */
-    frc2::CommandPtr Launch();
+    wpi::cmd::CommandPtr Launch();
 
 private:
     std::unique_ptr<SuperstructureIO> io_;

@@ -7,9 +7,9 @@
 
 #pragma once
 
-#include <frc/simulation/DCMotorSim.h>
-#include <frc/system/plant/DCMotor.h>
-#include <frc/system/plant/LinearSystemId.h>
+#include <wpi/math/system/DCMotor.hpp>
+#include <wpi/math/system/Models.hpp>
+#include <wpi/simulation/DCMotorSim.hpp>
 
 #include "subsystems/superstructure/SuperstructureConstants.h"
 #include "subsystems/superstructure/SuperstructureIO.h"
@@ -21,12 +21,12 @@ public:
     void SetIntakeLauncherVoltage(double volts) override;
 
 private:
-    frc::sim::DCMotorSim feederSim_{
-        frc::LinearSystemId::DCMotorSystem(frc::DCMotor::CIM(1), 0.004_kg_sq_m, SuperstructureConstants::feederMotorReduction),
-        frc::DCMotor::CIM(1)};
-    frc::sim::DCMotorSim intakeLauncherSim_{
-        frc::LinearSystemId::DCMotorSystem(frc::DCMotor::CIM(1), 0.004_kg_sq_m, SuperstructureConstants::intakeLauncherMotorReduction),
-        frc::DCMotor::CIM(1)};
+    wpi::sim::DCMotorSim feederSim_{
+        wpi::math::Models::SingleJointedArmFromPhysicalConstants(wpi::math::DCMotor::CIM(1), 0.004_kg_sq_m, SuperstructureConstants::feederMotorReduction),
+        wpi::math::DCMotor::CIM(1)};
+    wpi::sim::DCMotorSim intakeLauncherSim_{wpi::math::Models::SingleJointedArmFromPhysicalConstants(wpi::math::DCMotor::CIM(1), 0.004_kg_sq_m,
+                                                                                                     SuperstructureConstants::intakeLauncherMotorReduction),
+                                            wpi::math::DCMotor::CIM(1)};
 
     double feederAppliedVolts_ = 0.0;
     double intakeLauncherAppliedVolts_ = 0.0;

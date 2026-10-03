@@ -9,9 +9,9 @@
 
 #include <memory>
 
-#include <frc2/command/Command.h>
-#include <frc2/command/CommandPtr.h>
-#include <frc2/command/button/CommandGenericHID.h>
+#include <wpi/commands2/Command.hpp>
+#include <wpi/commands2/CommandPtr.hpp>
+#include <wpi/commands2/button/CommandGenericHID.hpp>
 
 #include "subsystems/drive/DemoDrive.h"
 #include "subsystems/vision/Vision.h"
@@ -32,7 +32,7 @@ public:
      *
      * @return the command to run in autonomous
      */
-    frc2::Command* GetAutonomousCommand();
+    wpi::cmd::Command* GetAutonomousCommand();
 
 private:
     /** Use this method to define your button->command mappings. */
@@ -40,8 +40,8 @@ private:
 
     std::unique_ptr<Vision> vision_;
 
-    DemoDrive drive_;                       // Demo drive subsystem, sim only
-    frc2::CommandGenericHID keyboard_{0}; // Keyboard 0 on port 0
+    DemoDrive drive_;                         // Demo drive subsystem, sim only
+    wpi::cmd::CommandGenericHID keyboard_{0}; // Keyboard 0 on port 0
 
-    frc2::CommandPtr autonomousCommand_;
+    wpi::cmd::CommandPtr autonomousCommand_;
 };

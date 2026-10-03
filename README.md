@@ -82,11 +82,13 @@ Use `akit::wpilog::WPILOGWriter` for on-robot log storage and `akit::wpilog::WPI
 
 ### Template projects
 
-C++ ports of the AdvantageKit template projects are in [`template_projects`](template_projects), with real, sim and replay modes already configured. Copy a directory to start a new robot project. The template projects have not been migrated yet and still target WPILib 2026.
+C++ ports of the AdvantageKit template projects are in [`template_projects`](template_projects), with real, sim and replay modes already configured for WPILib `2027.0.0-alpha-7` and Systemcore. Copy a directory to start a new robot project. They use Java 25 and Gradle 9.4.1.
 
 - [`skeleton`](template_projects/skeleton): logger setup only
-- [`diff_drive`](template_projects/diff_drive): differential drive with Talon SRX, Talon FX or Spark motors
-- [`kitbot_2026`](template_projects/kitbot_2026): 2026 kitbot drive and superstructure
+- [`diff_drive`](template_projects/diff_drive): differential drive with Talon FX or Spark motors, defaulting to Talon FX on CAN S0
+- [`kitbot_2026`](template_projects/kitbot_2026): 2026 kitbot drive and superstructure example migrated to 2027, defaulting to Talon FX on CAN S0; real hardware must use compatible motors and controllers
 - [`spark_swerve`](template_projects/spark_swerve): swerve with Spark Flex drive, Spark Max turn and high-frequency odometry
 - [`talonfx_swerve`](template_projects/talonfx_swerve): swerve configured from Phoenix Tuner X `TunerConstants`
 - [`vision`](template_projects/vision): Limelight and PhotonVision pose estimation
+
+The templates pin Phoenix 6 `26.70.0-alpha-2`, REVLib `2027.0.0-alpha-7`, PathPlanner `2027.0.0-alpha-4` and PhotonVision `dev-v2027.0.0-alpha-2-75-g2df8fb1c` where needed. Talon SRX and navX IO implementations are removed because compatible Phoenix 5 and Studica vendordeps are unavailable. Differential-drive templates use a local LTV controller adapter for PathPlanner's outdated alpha-4 controller header. CAN ports, motor reductions and gains must match the robot hardware.

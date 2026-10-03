@@ -11,15 +11,16 @@
 #include <vector>
 
 #include <akit/Logger.h>
-#include <frc/DriverStation.h>
-#include <frc/geometry/Twist2d.h>
-#include <frc/kinematics/DifferentialDriveWheelSpeeds.h>
 #include <pathplanner/lib/auto/AutoBuilder.h>
-#include <pathplanner/lib/controllers/PPLTVController.h>
 #include <pathplanner/lib/pathfinding/Pathfinding.h>
 #include <pathplanner/lib/util/PathPlannerLogging.h>
+#include <wpi/driverstation/MatchState.hpp>
+#include <wpi/driverstation/RobotState.hpp>
+#include <wpi/math/geometry/Twist2d.hpp>
+#include <wpi/math/kinematics/DifferentialDriveWheelVelocities.hpp>
 
 #include "Constants.h"
+#include "util/LTVPathFollowingController.h"
 #include "util/LocalADStarAK.h"
 
 using namespace DriveConstants;
@@ -29,24 +30,23 @@ Drive::Drive(std::unique_ptr<DriveIO> io, std::unique_ptr<GyroIO> gyroIO)
     , gyroIO_(std::move(gyroIO))
     , kS_(Constants::GetCurrentMode() == Constants::Mode::kSim ? simKs : realKs)
     , kV_(Constants::GetCurrentMode() == Constants::Mode::kSim ? simKv : realKv)
-    , sysId_(frc2::sysid::Config{std::nullopt, std::nullopt, std::nullopt,
-                                 [](frc::sysid::State state) { akit::Logger::RecordOutput("Drive/SysIdState", state); }},
-             frc2::sysid::Mechanism{[this](units::volt_t voltage) { RunOpenLoop(voltage.value(), voltage.value()); }, nullptr, this}) {
+    , sysId_(wpi::cmd::sysid::Config{std::nullopt, std::nullopt, std::nullopt,
+                                     [](wpi::sysid::State state) { akit::Logger::RecordOutput("Drive/SysIdState", state); }},
+             wpi::cmd::sysid::Mechanism{[this](wpi::units::volt_t voltage) { RunOpenLoop(voltage.value(), voltage.value()); }, nullptr, this}) {
     // Configure AutoBuilder for PathPlanner
     pathplanner::AutoBuilder::configure(
-        [this] { return GetPose(); }, [this](const frc::Pose2d& pose) { SetPose(pose); },
+        [this] { return GetPose(); }, [this](const wpi::math::Pose2d& pose) { SetPose(pose); },
         [this] {
-            return kinematics_.ToChassisSpeeds(frc::DifferentialDriveWheelSpeeds{units::meters_per_second_t{GetLeftVelocityMetersPerSec()},
-                                                                                 units::meters_per_second_t{GetRightVelocityMetersPerSec()}});
+            return kinematics_.ToChassisVelocities(wpi::math::DifferentialDriveWheelVelocities{
+                wpi::units::meters_per_second_t{GetLeftVelocityMetersPerSec()}, wpi::units::meters_per_second_t{GetRightVelocityMetersPerSec()}});
         },
-        [this](const frc::ChassisSpeeds& speeds) { RunClosedLoop(speeds); },
-        std::make_shared<pathplanner::PPLTVController>(0.02_s, units::meters_per_second_t{maxSpeedMetersPerSec}), ppConfig,
-        [] { return frc::DriverStation::GetAlliance().value_or(frc::DriverStation::Alliance::kBlue) == frc::DriverStation::Alliance::kRed; }, this);
+        [this](const wpi::math::ChassisVelocities& speeds) { RunClosedLoop(speeds); }, std::make_shared<LTVPathFollowingController>(0.02_s), ppConfig,
+        [] { return wpi::MatchState::GetAlliance().value_or(wpi::Alliance::BLUE) == wpi::Alliance::RED; }, this);
     pathplanner::Pathfinding::setPathfinder(std::make_unique<LocalADStarAK>());
     pathplanner::PathPlannerLogging::setLogActivePathCallback(
-        [](const std::vector<frc::Pose2d>& activePath) { akit::Logger::RecordOutput("Odometry/Trajectory", activePath); });
+        [](const std::vector<wpi::math::Pose2d>& activePath) { akit::Logger::RecordOutput("Odometry/Trajectory", activePath); });
     pathplanner::PathPlannerLogging::setLogTargetPoseCallback(
-        [](const frc::Pose2d& targetPose) { akit::Logger::RecordOutput("Odometry/TrajectorySetpoint", targetPose); });
+        [](const wpi::math::Pose2d& targetPose) { akit::Logger::RecordOutput("Odometry/TrajectorySetpoint", targetPose); });
 }
 
 void Drive::Periodic() {
@@ -61,19 +61,19 @@ void Drive::Periodic() {
         rawGyroRotation_ = gyroInputs_.yawPosition;
     } else {
         // Use the angle delta from the kinematics and module deltas
-        frc::Twist2d twist = kinematics_.ToTwist2d(units::meter_t{GetLeftPositionMeters() - lastLeftPositionMeters_},
-                                                   units::meter_t{GetRightPositionMeters() - lastRightPositionMeters_});
-        rawGyroRotation_ = rawGyroRotation_ + frc::Rotation2d{twist.dtheta};
+        wpi::math::Twist2d twist = kinematics_.ToTwist2d(wpi::units::meter_t{GetLeftPositionMeters() - lastLeftPositionMeters_},
+                                                         wpi::units::meter_t{GetRightPositionMeters() - lastRightPositionMeters_});
+        rawGyroRotation_ = rawGyroRotation_ + wpi::math::Rotation2d{twist.dtheta};
         lastLeftPositionMeters_ = GetLeftPositionMeters();
         lastRightPositionMeters_ = GetRightPositionMeters();
     }
 
     // Update odometry
-    poseEstimator_.Update(rawGyroRotation_, units::meter_t{GetLeftPositionMeters()}, units::meter_t{GetRightPositionMeters()});
+    poseEstimator_.Update(rawGyroRotation_, wpi::units::meter_t{GetLeftPositionMeters()}, wpi::units::meter_t{GetRightPositionMeters()});
 }
 
-void Drive::RunClosedLoop(const frc::ChassisSpeeds& speeds) {
-    auto wheelSpeeds = kinematics_.ToWheelSpeeds(speeds);
+void Drive::RunClosedLoop(const wpi::math::ChassisVelocities& speeds) {
+    auto wheelSpeeds = kinematics_.ToWheelVelocities(speeds);
     RunClosedLoop(wheelSpeeds.left.value(), wheelSpeeds.right.value());
 }
 
@@ -96,27 +96,27 @@ void Drive::Stop() {
     RunOpenLoop(0.0, 0.0);
 }
 
-frc2::CommandPtr Drive::SysIdQuasistatic(frc2::sysid::Direction direction) {
+wpi::cmd::CommandPtr Drive::SysIdQuasistatic(wpi::cmd::sysid::Direction direction) {
     return sysId_.Quasistatic(direction);
 }
 
-frc2::CommandPtr Drive::SysIdDynamic(frc2::sysid::Direction direction) {
+wpi::cmd::CommandPtr Drive::SysIdDynamic(wpi::cmd::sysid::Direction direction) {
     return sysId_.Dynamic(direction);
 }
 
-frc::Pose2d Drive::GetPose() const {
+wpi::math::Pose2d Drive::GetPose() const {
     return poseEstimator_.GetEstimatedPosition();
 }
 
-frc::Rotation2d Drive::GetRotation() const {
+wpi::math::Rotation2d Drive::GetRotation() const {
     return GetPose().Rotation();
 }
 
-void Drive::SetPose(const frc::Pose2d& pose) {
-    poseEstimator_.ResetPosition(rawGyroRotation_, units::meter_t{GetLeftPositionMeters()}, units::meter_t{GetRightPositionMeters()}, pose);
+void Drive::SetPose(const wpi::math::Pose2d& pose) {
+    poseEstimator_.ResetPosition(rawGyroRotation_, wpi::units::meter_t{GetLeftPositionMeters()}, wpi::units::meter_t{GetRightPositionMeters()}, pose);
 }
 
-void Drive::AddVisionMeasurement(const frc::Pose2d& visionPose, units::second_t timestamp) {
+void Drive::AddVisionMeasurement(const wpi::math::Pose2d& visionPose, wpi::units::second_t timestamp) {
     poseEstimator_.AddVisionMeasurement(visionPose, timestamp);
 }
 

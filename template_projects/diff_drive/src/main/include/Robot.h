@@ -13,7 +13,7 @@
 #include <akit/networktables/NT4Publisher.h>
 #include <akit/wpilog/WPILOGReader.h>
 #include <akit/wpilog/WPILOGWriter.h>
-#include <frc2/command/Command.h>
+#include <wpi/commands2/Command.hpp>
 
 #include "RobotContainer.h"
 
@@ -37,8 +37,8 @@ public:
     void TeleopInit() override;
     void TeleopPeriodic() override;
 
-    void TestInit() override;
-    void TestPeriodic() override;
+    void UtilityInit() override;
+    void UtilityPeriodic() override;
 
     void SimulationInit() override;
     void SimulationPeriodic() override;
@@ -48,6 +48,6 @@ private:
     std::optional<akit::networktables::NT4Publisher> nt4Publisher_;
     std::optional<akit::wpilog::WPILOGReader> replayReader_;
 
-    frc2::Command* autonomousCommand_ = nullptr;
+    wpi::cmd::Command* autonomousCommand_ = nullptr;
     std::optional<RobotContainer> robotContainer_;
 };

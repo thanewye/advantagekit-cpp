@@ -10,8 +10,8 @@
 #include <memory>
 
 #include <ctre/phoenix6/Pigeon2.hpp>
-#include <units/angle.h>
-#include <units/angular_velocity.h>
+#include <wpi/units/angle.hpp>
+#include <wpi/units/angular_velocity.hpp>
 
 #include "subsystems/drive/DriveConstants.h"
 #include "subsystems/drive/GyroIO.h"
@@ -25,9 +25,9 @@ public:
     void UpdateInputs(GyroIOInputs& inputs) override;
 
 private:
-    ctre::phoenix6::hardware::Pigeon2 pigeon_{DriveConstants::pigeonCanId};
-    ctre::phoenix6::StatusSignal<units::degree_t> yaw_ = pigeon_.GetYaw();
+    ctre::phoenix6::hardware::Pigeon2 pigeon_{DriveConstants::pigeonCanId, ctre::phoenix6::CANBus{wpi::CANPort::CAN_S0}};
+    ctre::phoenix6::StatusSignal<wpi::units::degree_t> yaw_ = pigeon_.GetYaw();
     std::shared_ptr<OdometryQueue> yawPositionQueue_;
     std::shared_ptr<OdometryQueue> yawTimestampQueue_;
-    ctre::phoenix6::StatusSignal<units::degrees_per_second_t> yawVelocity_ = pigeon_.GetAngularVelocityZWorld();
+    ctre::phoenix6::StatusSignal<wpi::units::degrees_per_second_t> yawVelocity_ = pigeon_.GetAngularVelocityZWorld();
 };

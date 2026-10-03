@@ -13,31 +13,31 @@
 #include <vector>
 
 #include <akit/autolog/AutoLogOutput.h>
-#include <frc/Alert.h>
-#include <frc/estimator/SwerveDrivePoseEstimator.h>
-#include <frc/geometry/Pose2d.h>
-#include <frc/geometry/Rotation2d.h>
-#include <frc/kinematics/ChassisSpeeds.h>
-#include <frc/kinematics/SwerveDriveKinematics.h>
-#include <frc/kinematics/SwerveModulePosition.h>
-#include <frc/kinematics/SwerveModuleState.h>
-#include <frc2/command/CommandPtr.h>
-#include <frc2/command/SubsystemBase.h>
-#include <frc2/command/sysid/SysIdRoutine.h>
-#include <units/time.h>
-#include <wpi/array.h>
+#include <wpi/commands2/CommandPtr.hpp>
+#include <wpi/commands2/SubsystemBase.hpp>
+#include <wpi/commands2/sysid/SysIdRoutine.hpp>
+#include <wpi/math/estimator/SwerveDrivePoseEstimator.hpp>
+#include <wpi/math/geometry/Pose2d.hpp>
+#include <wpi/math/geometry/Rotation2d.hpp>
+#include <wpi/math/kinematics/ChassisVelocities.hpp>
+#include <wpi/math/kinematics/SwerveDriveKinematics.hpp>
+#include <wpi/math/kinematics/SwerveModulePosition.hpp>
+#include <wpi/math/kinematics/SwerveModuleVelocity.hpp>
+#include <wpi/units/time.hpp>
+#include <wpi/util/Alert.hpp>
+#include <wpi/util/array.hpp>
 
 #include "subsystems/drive/DriveConstants.h"
 #include "subsystems/drive/GyroIO.h"
 #include "subsystems/drive/Module.h"
 #include "subsystems/drive/ModuleIO.h"
 
-class Drive : public frc2::SubsystemBase {
+class Drive : public wpi::cmd::SubsystemBase {
 public:
     inline static std::mutex odometryLock;
 
-    Drive(std::unique_ptr<GyroIO> gyroIO, std::unique_ptr<ModuleIO> flModuleIO, std::unique_ptr<ModuleIO> frModuleIO,
-          std::unique_ptr<ModuleIO> blModuleIO, std::unique_ptr<ModuleIO> brModuleIO);
+    Drive(std::unique_ptr<GyroIO> gyroIO, std::unique_ptr<ModuleIO> flModuleIO, std::unique_ptr<ModuleIO> frModuleIO, std::unique_ptr<ModuleIO> blModuleIO,
+          std::unique_ptr<ModuleIO> brModuleIO);
 
     void Periodic() override;
 
@@ -46,7 +46,7 @@ public:
      *
      * @param speeds Speeds in meters/sec
      */
-    void RunVelocity(const frc::ChassisSpeeds& speeds);
+    void RunVelocity(const wpi::math::ChassisVelocities& speeds);
 
     /** Runs the drive in a straight line with the specified drive output. */
     void RunCharacterization(double output);
@@ -61,10 +61,10 @@ public:
     void StopWithX();
 
     /** Returns a command to run a quasistatic test in the specified direction. */
-    frc2::CommandPtr SysIdQuasistatic(frc2::sysid::Direction direction);
+    wpi::cmd::CommandPtr SysIdQuasistatic(wpi::cmd::sysid::Direction direction);
 
     /** Returns a command to run a dynamic test in the specified direction. */
-    frc2::CommandPtr SysIdDynamic(frc2::sysid::Direction direction);
+    wpi::cmd::CommandPtr SysIdDynamic(wpi::cmd::sysid::Direction direction);
 
     /** Returns the position of each module in radians. */
     std::array<double, 4> GetWheelRadiusCharacterizationPositions() const;
@@ -73,17 +73,17 @@ public:
     double GetFFCharacterizationVelocity() const;
 
     /** Returns the current odometry pose. */
-    frc::Pose2d GetPose() const;
+    wpi::math::Pose2d GetPose() const;
 
     /** Returns the current odometry rotation. */
-    frc::Rotation2d GetRotation() const;
+    wpi::math::Rotation2d GetRotation() const;
 
     /** Resets the current odometry pose. */
-    void SetPose(const frc::Pose2d& pose);
+    void SetPose(const wpi::math::Pose2d& pose);
 
     /** Adds a new timestamped vision measurement. */
-    void AddVisionMeasurement(const frc::Pose2d& visionRobotPoseMeters, units::second_t timestampSeconds,
-                              const wpi::array<double, 3>& visionMeasurementStdDevs);
+    void AddVisionMeasurement(const wpi::math::Pose2d& visionRobotPoseMeters, wpi::units::second_t timestampSeconds,
+                              const wpi::util::array<double, 3>& visionMeasurementStdDevs);
 
     /** Returns the maximum linear speed in meters per sec. */
     double GetMaxLinearSpeedMetersPerSec() const;
@@ -93,27 +93,27 @@ public:
 
 private:
     /** Returns the module states (turn angles and drive velocities) for all of the modules. */
-    std::vector<frc::SwerveModuleState> GetModuleStates() const;
+    std::vector<wpi::math::SwerveModuleVelocity> GetModuleStates() const;
 
     /** Returns the module positions (turn angles and drive positions) for all of the modules. */
-    wpi::array<frc::SwerveModulePosition, 4> GetModulePositions() const;
+    wpi::util::array<wpi::math::SwerveModulePosition, 4> GetModulePositions() const;
 
     /** Returns the measured chassis speeds of the robot. */
-    frc::ChassisSpeeds GetChassisSpeeds() const;
+    wpi::math::ChassisVelocities GetChassisVelocities() const;
 
     std::unique_ptr<GyroIO> gyroIO_;
     GyroIOInputs gyroInputs_;
     std::array<std::unique_ptr<Module>, 4> modules_; // FL, FR, BL, BR
-    frc2::sysid::SysIdRoutine sysId_;
-    frc::Alert gyroDisconnectedAlert_{"Disconnected gyro, using kinematics as fallback.", frc::Alert::AlertType::kError};
+    wpi::cmd::sysid::SysIdRoutine sysId_;
+    wpi::util::Alert gyroDisconnectedAlert_{"Drive/GyroDisconnected", "Disconnected gyro, using kinematics as fallback.", wpi::util::Alert::Level::HIGH};
 
-    frc::SwerveDriveKinematics<4> kinematics_{DriveConstants::moduleTranslations};
-    frc::Rotation2d rawGyroRotation_{};
-    wpi::array<frc::SwerveModulePosition, 4> lastModulePositions_{wpi::empty_array}; // For delta tracking
-    frc::SwerveDrivePoseEstimator<4> poseEstimator_{kinematics_, rawGyroRotation_, lastModulePositions_, frc::Pose2d{}};
+    wpi::math::SwerveDriveKinematics<4> kinematics_{DriveConstants::moduleTranslations};
+    wpi::math::Rotation2d rawGyroRotation_{};
+    wpi::util::array<wpi::math::SwerveModulePosition, 4> lastModulePositions_{wpi::util::empty_array}; // For delta tracking
+    wpi::math::SwerveDrivePoseEstimator<4> poseEstimator_{kinematics_, rawGyroRotation_, lastModulePositions_, wpi::math::Pose2d{}};
 
 public:
     AUTOLOG_OUTPUT_SUPPLIER(moduleStates, GetModuleStates(), "SwerveStates/Measured");
-    AUTOLOG_OUTPUT_SUPPLIER(chassisSpeeds, GetChassisSpeeds(), "SwerveChassisSpeeds/Measured");
+    AUTOLOG_OUTPUT_SUPPLIER(chassisSpeeds, GetChassisVelocities(), "SwerveChassisSpeeds/Measured");
     AUTOLOG_OUTPUT_SUPPLIER(pose, GetPose(), "Odometry/Robot");
 };

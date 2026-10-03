@@ -11,13 +11,13 @@
 #include <string>
 
 #include <akit/Logger.h>
-#include <frc/geometry/Pose3d.h>
+#include <wpi/math/geometry/Pose3d.hpp>
 
 #include "subsystems/vision/VisionConstants.h"
 
 using namespace VisionConstants;
 
-frc::Rotation2d Vision::GetTargetX(size_t cameraIndex) const {
+wpi::math::Rotation2d Vision::GetTargetX(size_t cameraIndex) const {
     return inputs_[cameraIndex].latestTargetObservation.tx;
 }
 
@@ -28,10 +28,10 @@ void Vision::Periodic() {
     }
 
     // Initialize logging values
-    std::vector<frc::Pose3d> allTagPoses;
-    std::vector<frc::Pose3d> allRobotPoses;
-    std::vector<frc::Pose3d> allRobotPosesAccepted;
-    std::vector<frc::Pose3d> allRobotPosesRejected;
+    std::vector<wpi::math::Pose3d> allTagPoses;
+    std::vector<wpi::math::Pose3d> allRobotPoses;
+    std::vector<wpi::math::Pose3d> allRobotPosesAccepted;
+    std::vector<wpi::math::Pose3d> allRobotPosesRejected;
 
     // Loop over cameras
     for (size_t cameraIndex = 0; cameraIndex < io_.size(); cameraIndex++) {
@@ -39,10 +39,10 @@ void Vision::Periodic() {
         disconnectedAlerts_[cameraIndex]->Set(!inputs_[cameraIndex].connected);
 
         // Initialize logging values
-        std::vector<frc::Pose3d> tagPoses;
-        std::vector<frc::Pose3d> robotPoses;
-        std::vector<frc::Pose3d> robotPosesAccepted;
-        std::vector<frc::Pose3d> robotPosesRejected;
+        std::vector<wpi::math::Pose3d> tagPoses;
+        std::vector<wpi::math::Pose3d> robotPoses;
+        std::vector<wpi::math::Pose3d> robotPosesAccepted;
+        std::vector<wpi::math::Pose3d> robotPosesRejected;
 
         // Add tag poses
         for (int tagId : inputs_[cameraIndex].tagIds) {
@@ -55,13 +55,13 @@ void Vision::Periodic() {
         // Loop over pose observations
         for (const auto& observation : inputs_[cameraIndex].poseObservations) {
             // Check whether to reject pose
-            bool rejectPose = observation.tagCount == 0                                     // Must have at least one tag
+            bool rejectPose = observation.tagCount == 0                                              // Must have at least one tag
                               || (observation.tagCount == 1 && observation.ambiguity > maxAmbiguity) // Cannot be high ambiguity
-                              || std::abs(observation.pose.Z().value()) > maxZError          // Must have realistic Z coordinate
+                              || std::abs(observation.pose.Z().value()) > maxZError                  // Must have realistic Z coordinate
 
                               // Must be within the field boundaries
-                              || observation.pose.X() < 0.0_m || observation.pose.X() > aprilTagLayout.GetFieldLength() ||
-                              observation.pose.Y() < 0.0_m || observation.pose.Y() > aprilTagLayout.GetFieldWidth();
+                              || observation.pose.X() < 0.0_m || observation.pose.X() > aprilTagLayout.GetLength() || observation.pose.Y() < 0.0_m ||
+                              observation.pose.Y() > aprilTagLayout.GetWidth();
 
             // Add pose to log
             robotPoses.push_back(observation.pose);
@@ -90,7 +90,7 @@ void Vision::Periodic() {
             }
 
             // Send vision observation
-            consumer_(observation.pose.ToPose2d(), units::second_t{observation.timestamp}, {linearStdDev, linearStdDev, angularStdDev});
+            consumer_(observation.pose.ToPose2d(), wpi::units::second_t{observation.timestamp}, {linearStdDev, linearStdDev, angularStdDev});
         }
 
         // Log camera metadata

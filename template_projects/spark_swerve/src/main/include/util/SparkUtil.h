@@ -19,25 +19,25 @@ namespace SparkUtil {
     inline bool sparkStickyFault = false;
 
     /** Processes a value from a Spark only if the value is valid. */
-    inline void IfOk(rev::spark::SparkBase& spark, const std::function<double()>& supplier, const std::function<void(double)>& consumer) {
-        double value = supplier();
-        if (spark.GetLastError() == rev::REVLibError::kOk) {
-            consumer(value);
+    inline void IfOk(const std::function<rev::util::Signal<double>()>& supplier, const std::function<void(double)>& consumer) {
+        auto value = supplier();
+        if (value.IsValid()) {
+            consumer(value.Get());
         } else {
             sparkStickyFault = true;
         }
     }
 
     /** Processes a value from a Spark only if the value is valid. */
-    inline void IfOk(rev::spark::SparkBase& spark, std::span<const std::function<double()>> suppliers,
-                     const std::function<void(const std::vector<double>&)>& consumer) {
+    inline void IfOk(std::span<const std::function<rev::util::Signal<double>()>> suppliers, const std::function<void(const std::vector<double>&)>& consumer) {
         std::vector<double> values(suppliers.size());
         for (size_t i = 0; i < suppliers.size(); i++) {
-            values[i] = suppliers[i]();
-            if (spark.GetLastError() != rev::REVLibError::kOk) {
+            auto value = suppliers[i]();
+            if (!value.IsValid()) {
                 sparkStickyFault = true;
                 return;
             }
+            values[i] = value.Get();
         }
         consumer(values);
     }

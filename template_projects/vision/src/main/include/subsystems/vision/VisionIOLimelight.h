@@ -11,10 +11,10 @@
 #include <string_view>
 #include <vector>
 
-#include <frc/geometry/Pose3d.h>
-#include <frc/geometry/Rotation2d.h>
-#include <networktables/DoubleArrayTopic.h>
-#include <networktables/DoubleTopic.h>
+#include <wpi/math/geometry/Pose3d.hpp>
+#include <wpi/math/geometry/Rotation2d.hpp>
+#include <wpi/nt/DoubleArrayTopic.hpp>
+#include <wpi/nt/DoubleTopic.hpp>
 
 #include "subsystems/vision/VisionIO.h"
 
@@ -27,20 +27,20 @@ public:
      * @param name The configured name of the Limelight.
      * @param rotationSupplier Supplier for the current estimated rotation, used for MegaTag 2.
      */
-    VisionIOLimelight(std::string_view name, std::function<frc::Rotation2d()> rotationSupplier);
+    VisionIOLimelight(std::string_view name, std::function<wpi::math::Rotation2d()> rotationSupplier);
 
     void UpdateInputs(VisionIOInputs& inputs) override;
 
 private:
     /** Parses the 3D pose from a Limelight botpose array. */
-    static frc::Pose3d ParsePose(const std::vector<double>& rawLLArray);
+    static wpi::math::Pose3d ParsePose(const std::vector<double>& rawLLArray);
 
-    std::function<frc::Rotation2d()> rotationSupplier_;
-    nt::DoubleArrayPublisher orientationPublisher_;
+    std::function<wpi::math::Rotation2d()> rotationSupplier_;
+    wpi::nt::DoubleArrayPublisher orientationPublisher_;
 
-    nt::DoubleSubscriber latencySubscriber_;
-    nt::DoubleSubscriber txSubscriber_;
-    nt::DoubleSubscriber tySubscriber_;
-    nt::DoubleArraySubscriber megatag1Subscriber_;
-    nt::DoubleArraySubscriber megatag2Subscriber_;
+    wpi::nt::DoubleSubscriber latencySubscriber_;
+    wpi::nt::DoubleSubscriber txSubscriber_;
+    wpi::nt::DoubleSubscriber tySubscriber_;
+    wpi::nt::DoubleArraySubscriber megatag1Subscriber_;
+    wpi::nt::DoubleArraySubscriber megatag2Subscriber_;
 };
