@@ -1,0 +1,32 @@
+{
+  "fileName": "AdvantageKitCpp.json",
+  "name": "AdvantageKit C++",
+  "version": "27.0.0-alpha-6",
+  "wpilibYear": "2027_alpha7",
+  "uuid": "5fd90d86-32bd-4f56-b5f7-fc04f0a846ed",
+  "mavenUrls": [
+    "https://thanewye.github.io/advantagekit-cpp/maven"
+  ],
+  "jsonUrl": "https://thanewye.github.io/advantagekit-cpp/AdvantageKitCpp-2027.json",
+  "javaDependencies": [],
+  "jniDependencies": [],
+  "cppDependencies": [
+    {
+      "groupId": "com.ethanye.advantagekit",
+      "artifactId": "advantagekit-cpp",
+      "version": "27.0.0-alpha-6",
+      "libName": "AdvantageKitCpp",
+      "headerClassifier": "headers",
+      "sharedLibrary": false,
+      "skipInvalidPlatforms": true,
+      "binaryPlatforms": [
+        "linuxsystemcore",
+        "linuxarm64",
+        "windowsx86-64",
+        "windowsarm64",
+        "linuxx86-64",
+        "osxuniversal"
+      ]
+    }
+  ]
+}
