@@ -42,7 +42,15 @@ The Maven repository is written to `build/repos/releases`, and the generated ven
 
 ### Use in robot code
 
-Install the published `AdvantageKitCpp.json`, inherit the robot class from `akit::LoggedRobot`, configure at least one receiver, and start the logger before constructing logged subsystems:
+In VS Code, run **WPILib: Manage Vendor Libraries → Install new libraries (online)** and paste:
+
+```
+https://thanewye.github.io/advantagekit-cpp/AdvantageKitCpp.json
+```
+
+To pin a release, use `https://thanewye.github.io/advantagekit-cpp/AdvantageKitCpp-<version>.json` instead.
+
+Then inherit the robot class from `akit::LoggedRobot`, configure at least one receiver, and start the logger before constructing logged subsystems:
 
 ```cpp
 #include "akit/LoggedRobot.h"
