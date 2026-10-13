@@ -4,16 +4,31 @@
 
 #include <algorithm>
 #include <array>
+#include <cstring>
+
+#include <frc/Errors.h>
+#include <wpi/StackTrace.h>
 
 namespace akit {
+    namespace {
+        HAL_PowerDistributionHandle InitializePowerDistributionIgnoringStatus(const int moduleID, const HAL_PowerDistributionType moduleType) {
+            int32_t ignoredStatus = 0;
+            return HAL_InitializePowerDistribution(moduleID, moduleType, wpi::GetStackTrace(1).c_str(), &ignoredStatus);
+        }
+    } // namespace
+
     LoggedPowerDistribution::LoggedPowerDistribution()
         : moduleID_(frc::PowerDistribution::kDefaultModule)
-        , powerDistribution_(std::make_unique<frc::PowerDistribution>()) {}
+        , handle_(InitializePowerDistributionIgnoringStatus(frc::PowerDistribution::kDefaultModule, HAL_PowerDistributionType_kAutomatic)) {}
 
     LoggedPowerDistribution::LoggedPowerDistribution(const int moduleID, const frc::PowerDistribution::ModuleType moduleType)
         : moduleID_(moduleID)
         , moduleType_(moduleType)
-        , powerDistribution_(std::make_unique<frc::PowerDistribution>(moduleID, moduleType)) {}
+        , handle_(InitializePowerDistributionIgnoringStatus(moduleID, static_cast<HAL_PowerDistributionType>(moduleType))) {}
+
+    LoggedPowerDistribution::~LoggedPowerDistribution() {
+        HAL_CleanPowerDistribution(handle_);
+    }
 
     LoggedPowerDistribution* LoggedPowerDistribution::GetInstance() {
         if (!instance_) {
@@ -34,25 +49,41 @@ namespace akit {
     }
 
     void LoggedPowerDistribution::SaveToLog(LogTable table) const {
-        table.Put("Temperature", powerDistribution_->GetTemperature());
-        table.Put("Voltage", powerDistribution_->GetVoltage());
+        int32_t connectionStatus = 0;
+        const double voltage = HAL_GetPowerDistributionVoltage(handle_, &connectionStatus);
+        if (connectionStatus != 0) {
+            if (!disconnectedWarningReported_) {
+                FRC_ReportError(frc::warn::Warning, "[AdvantageKit] Power distribution module {} not responding, skipping power distribution logging.", moduleID_);
+                disconnectedWarningReported_ = true;
+            }
+            return;
+        }
 
+        int32_t ignoredStatus = 0;
+        table.Put("Temperature", HAL_GetPowerDistributionTemperature(handle_, &ignoredStatus));
+        table.Put("Voltage", voltage);
+
+        const int32_t channelCount = HAL_GetPowerDistributionNumChannels(handle_, &ignoredStatus);
         std::array<double, 24> channelCurrents{};
-        const auto allCurrents = powerDistribution_->GetAllCurrents();
-        std::copy_n(allCurrents.begin(), std::min(channelCurrents.size(), allCurrents.size()), channelCurrents.begin());
+        HAL_GetPowerDistributionAllChannelCurrents(handle_, channelCurrents.data(),
+                                                   std::clamp(channelCount, 0, static_cast<int32_t>(channelCurrents.size())), &ignoredStatus);
         table.Put("ChannelCurrent", std::span<const double>(channelCurrents));
 
-        table.Put("TotalCurrent", powerDistribution_->GetTotalCurrent());
-        table.Put("TotalPower", powerDistribution_->GetTotalPower());
-        table.Put("TotalEnergy", powerDistribution_->GetTotalEnergy());
-        table.Put("ChannelCount", static_cast<int64_t>(powerDistribution_->GetNumChannels()));
+        table.Put("TotalCurrent", HAL_GetPowerDistributionTotalCurrent(handle_, &ignoredStatus));
+        table.Put("TotalPower", HAL_GetPowerDistributionTotalPower(handle_, &ignoredStatus));
+        table.Put("TotalEnergy", HAL_GetPowerDistributionTotalEnergy(handle_, &ignoredStatus));
+        table.Put("ChannelCount", static_cast<int64_t>(channelCount));
         auto bitfieldToInteger = []<typename T>(const T& bitfield) {
             uint32_t raw = 0;
             static_assert(sizeof(raw) >= sizeof(T));
             std::memcpy(&raw, &bitfield, sizeof(T));
             return static_cast<int64_t>(raw);
         };
-        table.Put("Faults", bitfieldToInteger(powerDistribution_->GetFaults()));
-        table.Put("StickyFaults", bitfieldToInteger(powerDistribution_->GetStickyFaults()));
+        HAL_PowerDistributionFaults faults{};
+        HAL_GetPowerDistributionFaults(handle_, &faults, &ignoredStatus);
+        table.Put("Faults", bitfieldToInteger(faults));
+        HAL_PowerDistributionStickyFaults stickyFaults{};
+        HAL_GetPowerDistributionStickyFaults(handle_, &stickyFaults, &ignoredStatus);
+        table.Put("StickyFaults", bitfieldToInteger(stickyFaults));
     }
 } // namespace akit
