@@ -1,7 +1,7 @@
 {
   "fileName": "AdvantageKitCpp.json",
   "name": "AdvantageKit C++",
-  "version": "26.0.0-beta",
+  "version": "26.0.1-beta",
   "frcYear": "2026",
   "uuid": "5fd90d86-32bd-4f56-b5f7-fc04f0a846ed",
   "mavenUrls": [
@@ -14,7 +14,7 @@
     {
       "groupId": "com.ethanye.advantagekit",
       "artifactId": "advantagekit-cpp",
-      "version": "26.0.0-beta",
+      "version": "26.0.1-beta",
       "libName": "AdvantageKitCpp",
       "headerClassifier": "headers",
       "sharedLibrary": false,
