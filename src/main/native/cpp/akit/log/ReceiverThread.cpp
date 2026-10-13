@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <exception>
+#include <limits>
 #include <utility>
 
 #include <frc/Errors.h>
@@ -17,6 +18,7 @@ namespace akit {
         std::lock_guard lock(mutex_);
         if (std::ranges::find(dataReceivers_, receiver) != dataReceivers_.end()) return false;
         dataReceivers_.push_back(receiver);
+        firstSequence_[receiver] = 0;
         return true;
     }
 
@@ -24,6 +26,9 @@ namespace akit {
         std::lock_guard lock(mutex_);
         if (std::ranges::find(dataReceivers_, receiver) != dataReceivers_.end()) return false;
         dataReceivers_.push_back(receiver);
+        // currentSnapshot already contains everything queued so far, so only later snapshots
+        // should be dispatched to this receiver.
+        firstSequence_[receiver] = nextSequence_;
         receiver->Start();
         receiver->PutTable(currentSnapshot);
         return true;
@@ -32,6 +37,7 @@ namespace akit {
     void ReceiverThread::ClearDataReceivers() {
         std::lock_guard lock(mutex_);
         dataReceivers_.clear();
+        firstSequence_.clear();
         faulted_ = false;
     }
 
@@ -74,7 +80,7 @@ namespace akit {
             faulted_ = true;
             return false;
         }
-        queue_.push_back(std::move(snapshot));
+        queue_.emplace_back(nextSequence_++, std::move(snapshot));
         faulted_ = false;
         cv_.notify_one();
         return true;
@@ -95,22 +101,31 @@ namespace akit {
         return dataReceivers_;
     }
 
+    std::vector<LogDataReceiver*> ReceiverThread::ReceiversFor(uint64_t sequence) const {
+        std::lock_guard lock(mutex_);
+        std::vector<LogDataReceiver*> receivers;
+        for (auto* receiver : dataReceivers_) {
+            if (firstSequence_.at(receiver) <= sequence) receivers.push_back(receiver);
+        }
+        return receivers;
+    }
+
     /** Blocks for the next snapshot; returns std::nullopt once stopped and drained. */
-    std::optional<LogStorage> ReceiverThread::WaitAndPop() {
+    std::optional<std::pair<uint64_t, LogStorage>> ReceiverThread::WaitAndPop() {
         std::unique_lock lock(mutex_);
         cv_.wait(lock, [this] { return !queue_.empty() || stopRequested_; });
         if (queue_.empty()) return std::nullopt;
-        LogStorage entry = std::move(queue_.front());
+        auto entry = std::move(queue_.front());
         queue_.pop_front();
         return entry;
     }
 
     void ReceiverThread::DispatchNow(const LogTable& table) {
-        Dispatch(table);
+        Dispatch(table, std::numeric_limits<uint64_t>::max());
     }
 
-    void ReceiverThread::Dispatch(const LogTable& table) {
-        for (auto* receiver : SnapshotReceivers()) {
+    void ReceiverThread::Dispatch(const LogTable& table, uint64_t sequence) {
+        for (auto* receiver : ReceiversFor(sequence)) {
             try {
                 receiver->PutTable(table);
             } catch (const std::exception& e) {
@@ -126,9 +141,9 @@ namespace akit {
             receiver->Start();
 
         while (true) {
-            std::optional<LogStorage> entry = WaitAndPop();
+            auto entry = WaitAndPop();
             if (!entry) break;
-            Dispatch(LogTable(*entry));
+            Dispatch(LogTable(entry->second), entry->first);
         }
 
         EndReceivers();

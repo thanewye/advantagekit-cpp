@@ -2,10 +2,13 @@
 
 #include <condition_variable>
 #include <cstddef>
+#include <cstdint>
 #include <deque>
 #include <mutex>
 #include <optional>
 #include <thread>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "akit/log/LogDataReceiver.h"
@@ -87,15 +90,21 @@ namespace akit {
 
     private:
         void Run(std::vector<LogDataReceiver*> initialReceivers);
-        void Dispatch(const LogTable& table);
+        void Dispatch(const LogTable& table, uint64_t sequence);
         void EndReceivers();
-        [[nodiscard]] std::optional<LogStorage> WaitAndPop();
+        [[nodiscard]] std::optional<std::pair<uint64_t, LogStorage>> WaitAndPop();
         [[nodiscard]] std::vector<LogDataReceiver*> SnapshotReceivers() const;
+        /** Receivers registered before the snapshot with this sequence number was enqueued. */
+        [[nodiscard]] std::vector<LogDataReceiver*> ReceiversFor(uint64_t sequence) const;
 
         mutable std::mutex mutex_;
         std::condition_variable cv_;
         std::vector<LogDataReceiver*> dataReceivers_;
-        std::deque<LogStorage> queue_;
+        // First queue sequence each receiver should see; late receivers skip snapshots already
+        // covered by their catch-up snapshot.
+        std::unordered_map<LogDataReceiver*, uint64_t> firstSequence_;
+        std::deque<std::pair<uint64_t, LogStorage>> queue_;
+        uint64_t nextSequence_ = 0;
         bool stopRequested_ = false;
         bool faulted_ = false;
         bool synchronousRunning_ = false;

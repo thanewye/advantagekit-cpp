@@ -207,6 +207,31 @@ namespace {
         EXPECT_EQ(late.Log(), (std::vector<std::string>{"Start:Late", "PutTable:Late:99", "PutTable:Late:2", "End:Late"}));
     }
 
+    // A snapshot still waiting in the queue is already covered by the catch-up snapshot, so a
+    // receiver added while it is queued must not also receive it when it is dispatched later.
+    TEST(ReceiverThreadTest, AddDataReceiverAndCatchUpSkipsSnapshotsAlreadyQueued) {
+        ReceiverThread thread;
+        RecordingReceiver early("Early", /*blockUntilReleased=*/true);
+        thread.AddDataReceiver(&early);
+        thread.Start();
+
+        ASSERT_TRUE(thread.Enqueue(MakeSnapshot(1)));
+        ASSERT_TRUE(WaitUntil([&] { return early.HasEnteredPutTable(); }));
+        // Early is blocked on snapshot 1, so snapshot 2 stays queued while "late" is added.
+        ASSERT_TRUE(thread.Enqueue(MakeSnapshot(2)));
+
+        RecordingReceiver late("Late");
+        LogStorage catchUpStorage = MakeSnapshot(99);
+        EXPECT_TRUE(thread.AddDataReceiverAndCatchUp(&late, LogTable(catchUpStorage)));
+
+        ASSERT_TRUE(thread.Enqueue(MakeSnapshot(3)));
+        early.Release();
+        thread.End();
+
+        EXPECT_EQ(early.Log(), (std::vector<std::string>{"Start:Early", "PutTable:Early:1", "PutTable:Early:2", "PutTable:Early:3", "End:Early"}));
+        EXPECT_EQ(late.Log(), (std::vector<std::string>{"Start:Late", "PutTable:Late:99", "PutTable:Late:3", "End:Late"}));
+    }
+
     TEST(ReceiverThreadTest, AddDataReceiverAndCatchUpDeliversSynchronouslyAndIsNotDuplicated) {
         ReceiverThread thread;
         thread.Start();
